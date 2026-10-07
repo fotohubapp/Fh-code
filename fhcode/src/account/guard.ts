@@ -105,11 +105,12 @@ export interface AccountGuardOptions {
 
 export class AccountGuard {
   private readonly provider: AccountProvider;
-  private readonly sessionBudgetUsd: number | undefined;
+  private sessionBudgetUsd: number | undefined;
   private readonly minBalanceUsd: number;
   private readonly cacheMs: number;
   private cached: { at: number; limits: AccountLimits } | undefined;
   private spentUsd = 0;
+  private mediaUsd = 0;
   private turns = 0;
   // Spend recorded since the cached limits were fetched, so a cached balance is
   // not reused as if nothing had been spent since.
@@ -128,6 +129,21 @@ export class AccountGuard {
 
   get sessionTurns(): number {
     return this.turns;
+  }
+
+  /** The part of the session spend that went to FOTOhub MCP generations. */
+  get sessionMediaUsd(): number {
+    return this.mediaUsd;
+  }
+
+  get budgetUsd(): number | undefined {
+    return this.sessionBudgetUsd;
+  }
+
+  /** Sets or (with undefined) clears the session budget, e.g. from /budget. */
+  setBudget(usd: number | undefined): void {
+    if (usd !== undefined && !(Number.isFinite(usd) && usd > 0)) throw new RangeError("A session budget is a positive number of USD.");
+    this.sessionBudgetUsd = usd;
   }
 
   async limits(signal?: AbortSignal, fresh = false): Promise<AccountLimits> {
@@ -149,7 +165,7 @@ export class AccountGuard {
     if (this.sessionBudgetUsd !== undefined && this.spentUsd >= this.sessionBudgetUsd) {
       throw new AccountLimitError(
         `Session budget reached: spent $${fmt(this.spentUsd)} of $${fmt(this.sessionBudgetUsd)}. ` +
-          `Start a new session or raise --max-budget-usd.`,
+          `Raise it with /budget <usd> (or --max-budget-usd), or start a new session.`,
       );
     }
     const limits = await this.limits(signal);
@@ -174,6 +190,17 @@ export class AccountGuard {
     this.spentUsd += charged;
     this.spentSinceFetchUsd += charged;
     return charged;
+  }
+
+  /**
+   * Records spend outside the agent turn: a FOTOhub MCP generation, billed by
+   * FOTOhub when the tool ran. It counts toward the session budget.
+   */
+  recordMedia(usd: number): void {
+    if (!(usd > 0)) return;
+    this.spentUsd += usd;
+    this.mediaUsd += usd;
+    this.spentSinceFetchUsd += usd;
   }
 
   /** Forgets cached limits, e.g. after the user tops up. */

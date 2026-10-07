@@ -7,6 +7,7 @@ Create this with FOTOhub's MCP tools: $ARGUMENTS
 
 Follow the `fotohub-generation` skill:
 
+0. Check `fotohub_assets` (fh-code MCP) for a matching asset made earlier; reusing it is free.
 1. Work out the kind of asset and its parameters: size or aspect ratio, duration, count, and style.
 2. Pick a fitting model with `list_models` or `compare_prices`, and estimate the cost with `estimate_cost` or `get_price`. Say the price. If it is over $2, ask before generating.
 3. Generate, poll async jobs to completion, then download the result into the project. Use an existing assets folder, or `assets/` if there is none, with a descriptive file name.

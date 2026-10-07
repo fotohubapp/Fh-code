@@ -13,6 +13,7 @@ import path from "node:path";
 import { fmt } from "../account/guard.js";
 import { FotohubClient } from "../api/client.js";
 import { isPermissionMode } from "../agent/permissions.js";
+import { readAssets } from "../media.js";
 import { listSessions } from "../sessions.js";
 import { readUsage, summarizeUsage } from "../usage.js";
 import { VERSION } from "../version.js";
@@ -80,7 +81,11 @@ export async function startHubServer(options: HubServerOptions): Promise<{ url: 
       if (req.method === "GET" && url.pathname === "/api/usage") {
         const s = summarizeUsage(readUsage(Number(url.searchParams.get("days") ?? 14)));
         const money = (r: { key: string; usd: number; turns: number }) => ({ key: r.key, usd: fmt(r.usd), raw: r.usd, turns: r.turns });
-        return send(200, { total: money(s.total), byDay: s.byDay.map(money), byModel: s.byModel.map(money), byProject: s.byProject.slice(0, 8).map(money) });
+        return send(200, { total: money(s.total), byDay: s.byDay.map(money), byModel: s.byModel.map(money), byProject: s.byProject.slice(0, 8).map(money), bySource: s.bySource.map(money) });
+      }
+      if (req.method === "GET" && url.pathname === "/api/assets") {
+        const assets = readAssets({ search: url.searchParams.get("q") || undefined, limit: 60 });
+        return send(200, assets.map((a) => ({ ...a, cost: fmt(a.usd), urls: a.urls.filter((u) => /^https?:\/\//.test(u)) })));
       }
       if (req.method === "GET" && url.pathname === "/api/sessions") {
         return send(200, listSessions().slice(0, 30).map((s) => ({ id: s.id, title: s.title, cwd: s.cwd, updatedAt: s.updatedAt })));
@@ -151,6 +156,7 @@ tr.sel{background:color-mix(in srgb,var(--accent) 10%,transparent)}tbody tr{curs
 .pill{font-size:12px;padding:1px 8px;border-radius:99px;border:1px solid currentColor}.running{color:var(--run)}.done{color:var(--ok)}.failed,.exited{color:var(--bad)}.stopped{color:var(--muted)}
 pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;max-height:60vh;overflow:auto;font:12px/1.5 ui-monospace,Menlo,monospace}
 .muted{color:var(--muted)}.full{grid-column:1/-1}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.tile{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg)}.tile img,.tile video{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--border)}.tile audio{width:100%}.tile div{padding:6px 8px;font-size:12px}.tile code{color:var(--accent)}
 .bars{display:flex;align-items:flex-end;gap:6px;height:110px;overflow-x:auto;padding-bottom:4px}.bar{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:28px}.bar span{display:block;width:18px;background:var(--accent);border-radius:3px 3px 0 0}.bar small{font-size:10px;color:var(--muted)}
 </style></head><body>
 <header><h1><span>FH Code</span> hub</h1><div class="wallet" id="wallet">Wallet …</div></header>
@@ -164,6 +170,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px s
 <section><h2>Agent</h2><div id="detail" class="muted">Select an agent.</div></section>
 <section class="full"><h2>Agents</h2><table><thead><tr><th>Status</th><th>Name</th><th>Cost</th><th>Turns</th><th>Last tool</th><th>Started</th><th></th></tr></thead><tbody id="agents"></tbody></table></section>
 <section class="full"><h2>Spend, last 14 days</h2><div id="usage" class="muted">…</div></section>
+<section class="full"><h2>FOTOhub assets</h2><input id="aq" placeholder="Search prompts, tools, models"><div id="assets" class="gallery muted" style="margin-top:10px">…</div></section>
 <section class="full"><h2>Recent sessions</h2><div id="sessions" class="muted">…</div></section>
 </main>
 <script>
@@ -173,12 +180,14 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 async function wallet(){const w=await api('/api/wallet');document.getElementById('wallet').innerHTML=w.error?esc(w.error):'Wallet <b>$'+esc(w.balance)+'</b> · this month $'+esc(w.spent)+(w.limit?' of $'+esc(w.limit):'')+(w.tier?' · '+esc(w.tier):'');}
 async function agents(){const list=await api('/api/agents');document.getElementById('agents').innerHTML=list.map(a=>'<tr data-id="'+esc(a.id)+'" class="'+(a.id===sel?'sel':'')+'"><td><span class="pill '+esc(a.status)+'">'+esc(a.status)+'</span></td><td>'+esc(a.name)+'<div class="muted">'+esc(a.cwd)+'</div></td><td>$'+esc(a.cost)+'</td><td>'+a.turns+'</td><td>'+esc(a.lastActivity??'')+'</td><td>'+new Date(a.startedAt).toLocaleString()+'</td><td>'+(a.status==='running'?'<button class="ghost" data-stop="'+esc(a.id)+'">Stop</button>':'')+'</td></tr>').join('')||'<tr><td colspan="7" class="muted">No agents yet.</td></tr>';}
 async function detail(){if(!sel)return;const a=await api('/api/agents/'+sel);document.getElementById('detail').innerHTML='<div><b>'+esc(a.name)+'</b> <span class="pill '+esc(a.status)+'">'+esc(a.status)+'</span> <span class="muted">$'+esc(a.cost)+' · '+a.turns+' turns · '+a.toolCalls+' tool calls · '+esc(a.mode)+'</span></div><p class="muted">'+esc(a.prompt)+'</p>'+(a.error?'<pre style="color:var(--bad)">'+esc(a.error)+'</pre>':'')+'<pre>'+esc(a.output||'(no output yet)')+'</pre>'+(a.canContinue?'<textarea id="followup" placeholder="Follow-up for this agent: it continues in the same session."></textarea><div class="row"><button id="sendf">Send follow-up</button></div>':'');const b=document.getElementById('sendf');if(b)b.onclick=async()=>{const t=document.getElementById('followup').value;if(!t.trim())return;const r=await api('/api/agents/'+sel+'/send',{method:'POST',body:JSON.stringify({prompt:t})});if(r.error)return alert(r.error);sel=r.id;refresh();};}
-async function usage(){const u=await api('/api/usage?days=14');if(!u.total||!u.total.turns){document.getElementById('usage').textContent='No usage yet.';return;}const max=Math.max(...u.byDay.map(d=>d.raw),1e-9);document.getElementById('usage').innerHTML='<p><b>$'+esc(u.total.usd)+'</b> over '+u.total.turns+' turns</p><div class="bars">'+u.byDay.map(d=>'<div class="bar" title="'+esc(d.key)+': $'+esc(d.usd)+'"><span style="height:'+Math.max(2,Math.round(d.raw/max*80))+'px"></span><small>'+esc(d.key.slice(5))+'</small></div>').join('')+'</div><div class="row"><table><thead><tr><th>Model</th><th>Cost</th><th>Turns</th></tr></thead><tbody>'+u.byModel.map(r=>'<tr><td>'+esc(r.key)+'</td><td>$'+esc(r.usd)+'</td><td>'+r.turns+'</td></tr>').join('')+'</tbody></table><table><thead><tr><th>Project</th><th>Cost</th></tr></thead><tbody>'+u.byProject.map(r=>'<tr><td>'+esc(r.key)+'</td><td>$'+esc(r.usd)+'</td></tr>').join('')+'</tbody></table></div>';}
+async function usage(){const u=await api('/api/usage?days=14');if(!u.total||!u.total.turns){document.getElementById('usage').textContent='No usage yet.';return;}const max=Math.max(...u.byDay.map(d=>d.raw),1e-9);document.getElementById('usage').innerHTML='<p><b>$'+esc(u.total.usd)+'</b> over '+u.total.turns+' turns</p><div class="bars">'+u.byDay.map(d=>'<div class="bar" title="'+esc(d.key)+': $'+esc(d.usd)+'"><span style="height:'+Math.max(2,Math.round(d.raw/max*80))+'px"></span><small>'+esc(d.key.slice(5))+'</small></div>').join('')+'</div><div class="row"><table><thead><tr><th>Model</th><th>Cost</th><th>Turns</th></tr></thead><tbody>'+u.byModel.map(r=>'<tr><td>'+esc(r.key)+'</td><td>$'+esc(r.usd)+'</td><td>'+r.turns+'</td></tr>').join('')+'</tbody></table><table><thead><tr><th>Project</th><th>Cost</th></tr></thead><tbody>'+u.byProject.map(r=>'<tr><td>'+esc(r.key)+'</td><td>$'+esc(r.usd)+'</td></tr>').join('')+'</tbody></table><table><thead><tr><th>Source</th><th>Cost</th></tr></thead><tbody>'+(u.bySource||[]).map(r=>'<tr><td>'+esc(r.key)+'</td><td>$'+esc(r.usd)+'</td></tr>').join('')+'</tbody></table></div>';}
+async function assets(){const q=document.getElementById('aq').value;const list=await api('/api/assets'+(q?'?q='+encodeURIComponent(q):''));const media=(a,u)=>a.kind==='image'?'<a href="'+esc(u)+'" target="_blank" rel="noopener"><img loading="lazy" src="'+esc(u)+'" alt=""></a>':a.kind==='video'?'<video controls preload="none" src="'+esc(u)+'"></video>':a.kind==='audio'?'<audio controls preload="none" src="'+esc(u)+'"></audio>':'<div><a href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(u.split('/').pop())+'</a></div>';document.getElementById('assets').innerHTML=list.length?list.map(a=>'<div class="tile">'+(a.urls[0]?media(a,a.urls[0]):'')+'<div><code>'+esc(a.id)+'</code> · '+esc(a.tool)+' · $'+esc(a.cost)+(a.urls.length>1?' · '+a.urls.length+' files':'')+'<div class="muted">'+esc((a.prompt||'').slice(0,90))+'</div></div></div>').join(''):'No assets yet: generate with /fotohub:generate or /fotohub:design.';}
+document.getElementById('aq').oninput=()=>assets();
 async function sessions(){const s=await api('/api/sessions');document.getElementById('sessions').innerHTML=s.length?'<table><tbody>'+s.map(x=>'<tr><td>'+esc(x.title||x.id)+'<div class="muted">'+esc(x.cwd)+'</div></td><td class="muted">fhcode --resume '+esc(x.id)+'</td><td class="muted">'+new Date(x.updatedAt).toLocaleString()+'</td></tr>').join('')+'</tbody></table>':'No saved sessions.';}
 document.getElementById('agents').onclick=async e=>{const stop=e.target.closest('[data-stop]');if(stop){await api('/api/agents/'+stop.dataset.stop+'/stop',{method:'POST'});return refresh();}const tr=e.target.closest('tr[data-id]');if(tr){sel=tr.dataset.id;refresh();}};
 document.getElementById('start').onclick=async()=>{const body={prompt:prompt.value,name:document.getElementById('name').value,cwd:document.getElementById('cwd').value,mode:mode.value,allow:allow.value};if(!body.prompt.trim())return;const r=await api('/api/agents',{method:'POST',body:JSON.stringify(body)});if(r.error)return alert(r.error);sel=r.id;prompt.value='';refresh();};
 function refresh(){agents();detail();}
-wallet();sessions();usage();refresh();setInterval(refresh,2500);setInterval(()=>{wallet();usage();},30000);
+wallet();sessions();usage();assets();refresh();setInterval(refresh,2500);setInterval(()=>{wallet();usage();assets();},30000);
 </script></body></html>`;
 }
 

@@ -6,33 +6,71 @@ import { gradient, wordmark } from './wordmark'
 
 // The FOTOhub API header is always on screen above the prompt: the full panel
 // until the first prompt (and again with /fh), a compact header after that.
+// When FH Code drew its hero at the top of the terminal (FHCODE_HERO=top),
+// the band starts compact.
 const isExpanded = atom({ plugin: 'fh-code-ui', key: 'isExpanded' } as const, true)
 const wallet = atom({ plugin: 'fh-code-ui', key: 'wallet' } as const, null)
 const account = atom({ plugin: 'fh-code-ui', key: 'account' } as const, null)
+const warnedLow = atom({ plugin: 'fh-code-ui', key: 'warnedLow' } as const, false)
 
 const ACTIONS: [string, string][] = [
   ['/fotohub:design', 'design mode: a stunning site with FOTOhub-generated imagery'],
   ['/fotohub:generate', 'image, video, audio or 3D, priced before it runs'],
+  ['/fotohub:ask', 'Gemini, GPT, Nova: a second opinion, priced'],
   ['/fotohub:integrate', 'add the FOTOhub API to this project'],
+  ['/budget <usd>', "cap this session's spend · /budget off"],
   ['/login · /logout', 'your FOTOhub account'],
 ]
 
-const money = (v: number) => (v >= 1 || v === 0 ? v.toFixed(2) : String(Number(v.toPrecision(3))))
+// As FH Code prints dollars: cents, and small amounts to three significant digits ($0.0073).
+const money = (v: number) => {
+  if (v >= 1 || v === 0) return v.toFixed(2)
+  const s = String(Number(v.toPrecision(3)))
+  return /\.\d$/.test(s) ? `${s}0` : s
+}
+
+type Status = {
+  signedIn?: boolean
+  balanceUsd: number | null
+  sessionUsd: number
+  budgetUsd?: number | null
+  assets?: number
+  lowBalance?: boolean
+}
+
+function toWallet(s: Status): Wallet {
+  return {
+    signedIn: s.signedIn !== false,
+    balance: s.balanceUsd === null ? '?' : money(s.balanceUsd),
+    session: money(s.sessionUsd),
+    budget: s.budgetUsd ? money(s.budgetUsd) : null,
+    assets: s.assets ?? 0,
+    low: s.lowBalance === true,
+  }
+}
+
+/** Calls the FH Code gateway; null outside FH Code. */
+async function gateway($: EngineInterface, path: string, body?: unknown): Promise<{ ok: boolean; status: number; text: string } | null> {
+  const url = await $.env.get('FHCODE_GATEWAY_URL')
+  const token = await $.env.get('FHCODE_GATEWAY_TOKEN')
+  if (!url || !token) return null
+  return $.http.fetch(`${url}${path}`, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+}
 
 async function refreshWallet($: EngineInterface): Promise<void> {
   try {
-    const url = await $.env.get('FHCODE_GATEWAY_URL')
-    const token = await $.env.get('FHCODE_GATEWAY_TOKEN')
-    if (!url || !token) return
-    const res = await $.http.fetch(`${url}/fh/status`, { headers: { authorization: `Bearer ${token}` } })
-    if (!res.ok) return
-    const s = JSON.parse(res.text) as { signedIn?: boolean; balanceUsd: number | null; sessionUsd: number }
-    const next: Wallet = {
-      signedIn: s.signedIn !== false,
-      balance: s.balanceUsd === null ? '?' : money(s.balanceUsd),
-      session: money(s.sessionUsd),
+    const res = await gateway($, '/fh/status')
+    if (!res?.ok) return
+    const s = JSON.parse(res.text) as Status
+    await update($, wallet, () => toWallet(s))
+    if (s.lowBalance && !(await read($, warnedLow))) {
+      await update($, warnedLow, () => true)
+      $.ui.toast(`FOTOhub wallet is low: $${money(s.balanceUsd ?? 0)}. Top up at fotohub.app/console?tab=billing`)
     }
-    await update($, wallet, () => next)
   } catch {
     // Outside FH Code (no gateway), or the gateway is gone: the header shows without the wallet.
   }
@@ -59,6 +97,8 @@ export const register: Register = on => {
     const started = await next(e)
     if (e.isInteractive) {
       await $.command.register({ name: 'fh', description: 'Show the full FH Code · FOTOhub API panel' })
+      await $.command.register({ name: 'budget', description: "Cap this session's FOTOhub spend: /budget 5 · /budget off" })
+      if ((await $.env.get('FHCODE_HERO')) === 'top') await update($, isExpanded, () => false)
       void refreshWallet($)
     }
     return started
@@ -68,6 +108,36 @@ export const register: Register = on => {
     await update($, isExpanded, open => !open)
     void refreshWallet($)
     return { text: 'FH Code · FOTOhub API panel toggled.' }
+  })
+
+  on('command.run', { command: 'budget' }, async ($, e) => {
+    const arg = e.args.trim().replace(/^\$/, '')
+    const status = async () => {
+      const res = await gateway($, '/fh/status')
+      return res?.ok ? (JSON.parse(res.text) as Status) : null
+    }
+    if (!arg) {
+      const s = await status()
+      if (!s) return { text: '/budget works in FH Code sessions.' }
+      return {
+        text: s.budgetUsd
+          ? `Session budget: $${money(s.sessionUsd)} of $${money(s.budgetUsd)} spent. /budget <usd> changes it, /budget off removes it.`
+          : `No session budget; $${money(s.sessionUsd)} spent so far. /budget <usd> sets one.`,
+      }
+    }
+    const off = /^(off|none|clear|0)$/i.test(arg)
+    const usd = Number(arg.replace(',', '.'))
+    if (!off && !(usd > 0)) return { text: 'Usage: /budget 5 (USD for this session) · /budget off' }
+    const res = await gateway($, '/fh/budget', { usd: off ? null : usd })
+    if (!res) return { text: '/budget works in FH Code sessions.' }
+    if (!res.ok) return { text: `Could not set the budget: ${res.text}` }
+    const s = JSON.parse(res.text) as Status
+    await update($, wallet, () => toWallet(s))
+    return {
+      text: off
+        ? 'Session budget removed.'
+        : `Session budget: $${money(usd)}. FH Code stops before a turn once $${money(usd)} is spent (now $${money(s.sessionUsd)}, generations included).`,
+    }
   })
 
   // /login and /logout are the FOTOhub account's in FH Code.
@@ -124,7 +194,11 @@ export const register: Register = on => {
     const status = !w
       ? 'wallet …'
       : w.signedIn
-        ? `wallet $${w.balance} · session $${w.session}`
+        ? [
+            `wallet $${w.balance}${w.low ? ' low' : ''}`,
+            `session $${w.session}${w.budget ? ` of $${w.budget}` : ''}`,
+            ...(w.assets ? [`${w.assets} asset${w.assets === 1 ? '' : 's'}`] : []),
+          ].join(' · ')
         : 'not signed in · /login'
 
     const header = (
@@ -147,7 +221,7 @@ export const register: Register = on => {
             </Text>
             {who ? <Text dimColor> · {who}</Text> : null}
           </Text>
-          <Text color={w && !w.signedIn ? 'warning' : undefined} dimColor={!w || w.signedIn}>
+          <Text color={w && (!w.signedIn || w.low) ? 'warning' : undefined} dimColor={!w || (w.signedIn && !w.low)}>
             {status}
           </Text>
         </Box>
@@ -155,9 +229,25 @@ export const register: Register = on => {
     )
 
     if (!expanded) {
+      // One line under the transcript: the hero itself is at the top of the terminal (or /fh).
+      const name = [...'FOTOhub API']
       return (
-        <Box flexDirection="column" paddingX={1}>
-          {header}
+        <Box flexDirection="row" justifyContent="space-between" paddingX={1}>
+          <Text>
+            {name.map((ch, i) => (
+              <Text key={`n${i}`} color={gradient(i / (name.length - 1))} bold>
+                {ch}
+              </Text>
+            ))}
+            <Text dimColor> · </Text>
+            <Text color={gradient(0.5)} bold>
+              FH Code
+            </Text>
+            {who ? <Text dimColor> · {who}</Text> : null}
+          </Text>
+          <Text color={w && (!w.signedIn || w.low) ? 'warning' : undefined} dimColor={!w || (w.signedIn && !w.low)}>
+            {status}
+          </Text>
         </Box>
       )
     }

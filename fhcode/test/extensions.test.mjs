@@ -19,8 +19,8 @@ const repoPlugins = fileURLToPath(new URL("../../plugins", import.meta.url));
 test("every plugin in this repository loads into FH Code", () => {
   const ext = loadExtensions(mkdtempSync(path.join(os.tmpdir(), "fhcode-ws-")), {}, [repoPlugins]);
   assert.equal(ext.plugins.length, 15);
-  for (const cmd of ["fotohub:integrate", "fotohub:generate", "fotohub:wallet"]) assert.ok(ext.commands.has(cmd), `missing command ${cmd}`);
-  for (const skill of ["fotohub-api", "fotohub-generation", "fotohub-commerce"]) assert.ok(ext.skills.has(skill), `missing skill ${skill}`);
+  for (const cmd of ["fotohub:integrate", "fotohub:generate", "fotohub:wallet", "fotohub:ask", "fotohub:compare", "fotohub:second-opinion"]) assert.ok(ext.commands.has(cmd), `missing command ${cmd}`);
+  for (const skill of ["fotohub-api", "fotohub-generation", "fotohub-commerce", "fotohub-text-models"]) assert.ok(ext.skills.has(skill), `missing skill ${skill}`);
   assert.ok(ext.agents.has("fotohub-integrator"));
   for (const cmd of ["commit", "commit-commands:commit", "feature-dev", "code-review", "ralph-loop", "hookify"]) {
     assert.ok(ext.commands.has(cmd), `missing command ${cmd}`);

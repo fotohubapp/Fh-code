@@ -2,6 +2,7 @@ import { packagesTool, topupTool, walletTool } from "./account.js";
 import { bashTool } from "./bash.js";
 import { docsReadTool, docsSearchTool } from "./docs.js";
 import { editTool, globTool, grepTool, readTool, writeTool } from "./files.js";
+import { askModelTool, assetsTool, compareModelsTool, modelsTool } from "./models.js";
 import { webFetchTool } from "./web.js";
 import type { Tool } from "./types.js";
 
@@ -20,6 +21,10 @@ export function defaultTools(): Tool[] {
     walletTool,
     packagesTool,
     topupTool,
+    modelsTool,
+    askModelTool,
+    compareModelsTool,
+    assetsTool,
   ];
 }
 

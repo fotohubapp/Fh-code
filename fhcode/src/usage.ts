@@ -1,7 +1,8 @@
 /**
  * The usage ledger: one line per billed FOTOhub turn, in
  * ~/.fhcode/usage.jsonl, written by the gateway (engine sessions and hub
- * agents) and by the lite agent. `fhcode usage` and the hub dashboard read it.
+ * agents) and by the lite agent, plus one line per paid FOTOhub MCP call
+ * (source "media", see media.ts) and per text-model question (source "chat", models.ts). `fhcode usage` and the hub dashboard read it.
  */
 
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
@@ -21,8 +22,8 @@ export interface UsageEntry {
   usd: number;
   /** Workspace the turn ran in. */
   cwd: string;
-  /** "engine", "lite", or "hub" for background agents. */
-  source: "engine" | "lite" | "hub";
+  /** "engine", "lite", "hub" for background agents, "media" for FOTOhub MCP generations, "chat" for text models asked directly. */
+  source: "engine" | "lite" | "hub" | "media" | "chat";
   /** Hub agent id, for background agents. */
   agent?: string;
 }
@@ -32,7 +33,7 @@ export function recordUsage(entry: Omit<UsageEntry, "ts" | "source" | "agent"> &
   const line: UsageEntry = {
     ts: new Date().toISOString(),
     ...entry,
-    source: agent ? "hub" : (entry.source ?? "engine"),
+    source: entry.source === "media" || entry.source === "chat" ? entry.source : agent ? "hub" : (entry.source ?? "engine"),
     ...(agent ? { agent } : {}),
   };
   try {

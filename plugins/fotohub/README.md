@@ -18,6 +18,10 @@ FOTOhub's own plugin for FH Code. It ships with every FH Code release and loads 
 | Command | `/fotohub:integrate [what]` | Add FOTOhub to the current project, with the official SDK for its language |
 | Command | `/fotohub:generate <description>` | Generate an image, video, audio or 3D asset with a cost estimate first, and save it into the project |
 | Command | `/fotohub:wallet` | Wallet balance, monthly limit, spend and top-up options |
+| Skill | `fotohub-text-models` | Which FOTOhub text model fits a task (Gemini, GPT-5.1, Nova, Claude) and what runs on Agent Compute (Grok, DeepSeek, Kimi, Qwen) |
+| Command | `/fotohub:ask [model] <question>` | Ask another FOTOhub text model, with the cost |
+| Command | `/fotohub:compare <question>` | The same question to Gemini, GPT-5.1 and Claude, compared |
+| Command | `/fotohub:second-opinion [focus]` | Gemini and GPT-5.1 review your uncommitted changes; FH Code verifies each finding |
 | Agent | `fotohub-integrator` | Builds FOTOhub API integrations end to end |
 | Agent | `fotohub-docs-expert` | Answers FOTOhub API questions from docs.fotohub.app, with links |
 

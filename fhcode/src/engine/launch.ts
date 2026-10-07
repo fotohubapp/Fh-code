@@ -28,6 +28,9 @@ import { startGateway } from "../gateway/server.js";
 import { ENGINE_MODELS } from "../gateway/translate.js";
 import { bundledPluginDirs } from "../bundled.js";
 import { writeLspPlugin } from "../deps.js";
+import { recordMediaCall } from "../media.js";
+import { VERSION } from "../version.js";
+import { renderHero } from "./hero.js";
 import { recordUsage } from "../usage.js";
 
 export const ENGINE_HOME = path.join(CONFIG_DIR, "engine");
@@ -80,6 +83,16 @@ function theme(name: string, base: "dark" | "light", c: typeof PURPLE_DARK) {
   };
 }
 
+const THEME_REVISION = "2\n";
+
+function readText(file: string): string {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return "";
+  }
+}
+
 function readJson(file: string): Record<string, unknown> {
   try {
     return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
@@ -94,19 +107,19 @@ export function prepareEngineHome(config: FhcodeConfig): { mcpConfigFile: string
   writeFileSync(path.join(ENGINE_HOME, "themes", "fotohub-dark.json"), JSON.stringify(theme("FOTOhub dark", "dark", PURPLE_DARK), null, 2));
   writeFileSync(path.join(ENGINE_HOME, "themes", "fotohub-light.json"), JSON.stringify(theme("FOTOhub light", "light", PURPLE_LIGHT), null, 2));
 
-  // Switch to the FOTOhub theme once: on the first run, and once for a home
-  // that predates the theme (still on a built-in dark or light theme). After
-  // that the user's /theme choice is kept.
+  // Switch to the FOTOhub theme once per THEME_REVISION: on the first run, and
+  // once for a home still on a built-in theme (dark, light, their variants, or
+  // auto). After that the user's /theme choice is kept.
   const state = path.join(ENGINE_HOME, ".claude.json");
   const marker = path.join(ENGINE_HOME, ".fhcode-theme");
-  if (!existsSync(marker)) {
+  if (readText(marker) !== THEME_REVISION) {
     const current = readJson(state);
     const theme = typeof current.theme === "string" ? current.theme : "";
-    if (!theme || /^(dark|light)(-|$)/.test(theme)) {
+    if (!theme || /^(dark|light|auto)(-|$)/.test(theme)) {
       current.theme = theme.startsWith("light") ? "custom:fotohub-light" : "custom:fotohub-dark";
       writeFileSync(state, JSON.stringify(current, null, 2), { mode: 0o600 });
     }
-    writeFileSync(marker, "applied\n");
+    writeFileSync(marker, THEME_REVISION);
   }
 
   // FH Code owns these keys; everything else in settings.json is the user's.
@@ -124,6 +137,8 @@ export function prepareEngineHome(config: FhcodeConfig): { mcpConfigFile: string
       "Ask about any FOTOhub API: FH Code searches docs.fotohub.app",
       "Wallet and top-ups: ask for your FOTOhub balance, or run fhcode wallet",
       "Background agents: fhcode agents run \"...\" · dashboard: fhcode hub",
+      "Second opinion from Gemini and GPT-5.1 on your changes: /fotohub:second-opinion",
+      "Cap this session's spend: /budget 5 · everything you generated: fhcode assets",
     ],
   };
   const markets = (settings.extraKnownMarketplaces as Record<string, unknown> | undefined) ?? {};
@@ -144,7 +159,9 @@ export function prepareEngineHome(config: FhcodeConfig): { mcpConfigFile: string
 
 export const FOTOHUB_SYSTEM_PROMPT = `You are running as FH Code (FOTOhub Code), FOTOhub's coding agent, on the FOTOhub API. When asked who you are, say FH Code by FOTOhub (powered by Claude models served through FOTOhub).
 FOTOhub (fotohub.app) is an AI platform with one API for image, video, music, speech, 3D, chat/LLM, storage, compute and commerce integrations. Before writing or explaining code that uses the FOTOhub API, SDKs, CLI, MCP server or integrations, look it up with the fh-code MCP tools fotohub_docs_search and fotohub_docs_read (docs.fotohub.app) and follow the docs; cite the page. API base URL https://apis.fotohub.app with "Authorization: Bearer fh_live_..."; keys belong in environment variables, never in code.
-FOTOhub's own tools (generate and edit images, video, audio, 3D, storage, pricing, wallet) are on the fotohub MCP server; generation costs money, so estimate first when the cost is unclear and only generate what the user asked for. Every turn, including subagents, is billed to the user's FOTOhub wallet: work efficiently.`;
+FOTOhub's own tools (generate and edit images, video, audio, 3D, storage, pricing, wallet) are on the fotohub MCP server; generation costs money, so estimate first when the cost is unclear and only generate what the user asked for. Before generating, search fotohub_assets (fh-code MCP) for an asset made earlier that fits; reusing one is free.
+Other FOTOhub text models (Gemini 2.5 Flash/Pro, GPT-5.1, Amazon Nova) answer through fotohub_ask_model and fotohub_compare_models: use them when the user asks for another model, a second opinion or a comparison; they see only the prompt you give them. Grok, DeepSeek, Kimi and Qwen run on FOTOhub Agent Compute, not in this session (see the fotohub-text-models skill).
+Every turn, including subagents, is billed to the user's FOTOhub wallet: work efficiently.`;
 
 function engineEnv(gatewayUrl: string, token: string, config: FhcodeConfig): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
@@ -178,6 +195,13 @@ function engineEnv(gatewayUrl: string, token: string, config: FhcodeConfig): Nod
     FHCODE_NODE: process.execPath,
     FHCODE_BIN: BIN,
   });
+  // The main-screen layout keeps FH Code's hero at the top, above the engine;
+  // the fullscreen one clears the screen. CLAUDE_CODE_NO_FLICKER or
+  // `"fullscreen": true` in ~/.fhcode/config.json pick the fullscreen layout.
+  if (process.env.CLAUDE_CODE_NO_FLICKER === undefined && !config.fullscreen) {
+    env.CLAUDE_CODE_NO_FLICKER = "0";
+    env.FHCODE_HERO = "top";
+  }
   return env;
 }
 
@@ -197,6 +221,8 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
     maxBudgetUsd: config.maxBudgetUsd,
     accountProvider: config.accountLimitsUrl ? new HttpAccountProvider(config.accountLimitsUrl, config.apiKey!) : undefined,
     onTurn: (t) => recordUsage({ model: t.model, inputTokens: t.inputTokens, outputTokens: t.outputTokens, usd: t.chargedUsd, cwd: process.cwd() }),
+    onMedia: (call) => void recordMediaCall(call),
+    cwd: process.cwd(),
   });
   options.onGateway?.(gateway.url);
 
@@ -218,7 +244,10 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
       ]
     : args;
 
-  const child = spawn(engine, engineArgs, { stdio: "inherit", env: engineEnv(gateway.url, gateway.token, config) });
+  const env = engineEnv(gateway.url, gateway.token, config);
+  const headless = args.includes("-p") || args.includes("--print");
+  if (isSession && !headless && env.FHCODE_HERO === "top" && process.stdout.isTTY) await printHero(config, gateway.guard);
+  const child = spawn(engine, engineArgs, { stdio: "inherit", env });
   // Ctrl+C belongs to the engine's interface; FH Code just waits for it to finish.
   const ignore = () => undefined;
   process.on("SIGINT", ignore);
@@ -237,13 +266,17 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
   process.off("SIGTERM", onTerm);
   await gateway.close();
 
-  const headless = args.includes("-p") || args.includes("--print");
   const streamJson = args.some((a, i) => a === "--output-format" && args[i + 1] === "stream-json") || args.includes("--output-format=stream-json");
   if (headless && streamJson) {
     // The engine's own cost figure uses Anthropic list prices; this is what FOTOhub charged.
-    process.stdout.write(JSON.stringify({ type: "fh_billing", sessionUsd: gateway.guard.sessionSpentUsd, turns: gateway.stats.turns }) + "\n");
+    const { guard, stats } = gateway;
+    process.stdout.write(
+      JSON.stringify({ type: "fh_billing", sessionUsd: round(guard.sessionSpentUsd), mediaUsd: round(guard.sessionMediaUsd), turns: stats.turns, mediaCalls: stats.mediaCalls, assets: stats.assets }) + "\n",
+    );
   } else if (!headless && isSession && gateway.stats.turns > 0) {
-    process.stderr.write(`FH Code · FOTOhub charged $${fmt(gateway.guard.sessionSpentUsd)} for ${gateway.stats.turns} turns this session.\n`);
+    const { guard, stats } = gateway;
+    const media = stats.mediaCalls ? `, including $${fmt(guard.sessionMediaUsd)} for ${stats.mediaCalls} generations (${stats.assets} in \`fhcode assets\`)` : "";
+    process.stderr.write(`FH Code · FOTOhub charged $${fmt(guard.sessionSpentUsd)} for ${stats.turns} turns this session${media}.\n`);
   }
   return code;
 }
@@ -267,8 +300,15 @@ export async function statusLine(): Promise<number> {
         headers: { authorization: `Bearer ${process.env.FHCODE_GATEWAY_TOKEN ?? ""}` },
         signal: AbortSignal.timeout(3000),
       });
-      const s = (await res.json()) as { balanceUsd: number | null; sessionUsd: number };
-      wallet = `${s.balanceUsd === null ? "" : ` · wallet $${fmt(s.balanceUsd)}`} · session $${fmt(s.sessionUsd)}`;
+      const s = (await res.json()) as { signedIn?: boolean; balanceUsd: number | null; sessionUsd: number; budgetUsd?: number | null; assets?: number; lowBalance?: boolean };
+      if (s.signedIn === false) wallet = " · not signed in (/login)";
+      else {
+        const amber = (t: string) => `\x1b[38;2;251;191;36m${t}\x1b[0m`;
+        const balance = s.balanceUsd === null ? "" : ` · wallet ${s.lowBalance ? amber(`$${fmt(s.balanceUsd)} low`) : `$${fmt(s.balanceUsd)}`}`;
+        const budget = s.budgetUsd ? ` of $${fmt(s.budgetUsd)}` : "";
+        const assets = s.assets ? ` · ${s.assets} asset${s.assets === 1 ? "" : "s"}` : "";
+        wallet = `${balance} · session $${fmt(s.sessionUsd)}${budget}${assets}`;
+      }
     } catch {
       wallet = "";
     }
@@ -276,4 +316,33 @@ export async function statusLine(): Promise<number> {
   const purple = (s: string) => `\x1b[38;2;167;139;250m${s}\x1b[0m`;
   process.stdout.write(`${purple("FH Code")}${model ? ` · ${model}` : ""}${wallet}\n`);
   return 0;
+}
+
+/** Draws the FOTOhub API hero at the top of the terminal, with the wallet if it answers quickly. */
+async function printHero(config: FhcodeConfig, guard: { estimatedBalance(): Promise<number> }): Promise<void> {
+  const signedIn = Boolean(config.apiKey);
+  const balanceUsd = signedIn
+    ? await Promise.race([guard.estimatedBalance().catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 1500).unref())])
+    : null;
+  const model = ENGINE_MODELS.find((m) => m.fotohub === config.model)?.display.replace(/\s*\(FOTOhub\)$/, "");
+  const home = process.env.HOME;
+  const cwd = home && process.cwd().startsWith(home) ? `~${process.cwd().slice(home.length)}` : process.cwd();
+  process.stdout.write(
+    renderHero({
+      version: VERSION,
+      columns: process.stdout.columns ?? 80,
+      signedIn,
+      account: config.account?.email,
+      plan: config.account?.plan,
+      balanceUsd,
+      model,
+      cwd,
+      color: !process.env.NO_COLOR,
+    }),
+  );
+}
+
+/** Rounds USD to a millionth, so a sum such as 0.004 + 0.003 reports as 0.007. */
+function round(usd: number): number {
+  return Math.round(usd * 1e6) / 1e6;
 }

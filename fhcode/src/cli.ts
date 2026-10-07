@@ -31,6 +31,8 @@ import { localChecks, runStep, setupPlan, type Check } from "./deps.js";
 import { findEngine } from "./engine/launch.js";
 import { HttpTransport, McpClient } from "./mcp/client.js";
 import { browserLogin, logout, saveKey } from "./auth.js";
+import { assetFileName, findAsset, readAssets } from "./media.js";
+import { compareModels, COMPUTE_MODELS, describeModels, findTextModel, TEXT_MODELS } from "./models.js";
 import { VERSION } from "./version.js";
 
 const useColor = stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== "dumb";
@@ -74,7 +76,7 @@ export interface ParsedArgs {
   check: boolean;
 }
 
-const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions", "usage", "doctor", "setup"]);
+const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions", "usage", "doctor", "setup", "assets", "models", "ask"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const out: ParsedArgs = {
@@ -110,6 +112,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case "-p":
       case "--print":
         out.print = need(i++, a);
+        break;
+      case "--json":
+        out.outputFormat = "json";
         break;
       case "--output-format": {
         const v = need(i++, a);
@@ -262,6 +267,12 @@ Account
   fhcode wallet                   wallet balance, monthly limit, tier
   fhcode packages                 wallet top-up packages
 
+FOTOhub models and media
+  fhcode models                   FOTOhub text models: agent, chat (Gemini, GPT-5.1, Nova), Agent Compute
+  fhcode ask <model> "question"   ask a FOTOhub text model; several: gemini-pro,gpt-4o "..."
+  fhcode assets [words] [--days n] [--project]   images, video, audio and 3D generated in FH Code
+  fhcode assets pull <id> [dir]   download an asset into the project (default assets/fotohub)
+
 Other
   fhcode docs <query>             search docs.fotohub.app
   fhcode sessions                 saved sessions
@@ -332,6 +343,12 @@ export async function liteMain(argv: string[]): Promise<number> {
         return await doctorCommand(args, config);
       case "setup":
         return await setupCommand(args);
+      case "assets":
+        return await assetsCommand(args);
+      case "models":
+        return await modelsCommand(config);
+      case "ask":
+        return await askCommand(args, config);
     }
   } catch (err) {
     stderr.write(`${red(describeError(err))}\n`);
@@ -817,7 +834,12 @@ function usageCommand(args: ParsedArgs): number {
   stdout.write(`\n${bold("By project")}\n`);
   for (const r of s.byProject.slice(0, 10)) stdout.write(row(r, r.key.replace(process.env.HOME ?? "\u0000", "~")));
   stdout.write(`\n${bold("By source")}\n`);
-  for (const r of s.bySource) stdout.write(row(r, r.key === "hub" ? "hub (background agents)" : r.key));
+  const SOURCES: Record<string, string> = {
+    hub: "hub (background agents)",
+    media: "media (FOTOhub generations, calls)",
+    chat: "chat (text models asked, calls)",
+  };
+  for (const r of s.bySource) stdout.write(row(r, SOURCES[r.key] ?? r.key));
   return 0;
 }
 
@@ -1034,6 +1056,103 @@ export async function login(key: string | undefined, config: FhcodeConfig, opts:
     stderr.write(red(`Not signed in: ${describeError(err)}\n`) + dim("Try: fhcode login --manual (paste an API key)\n"));
     return 1;
   }
+}
+
+function clientFor(config: FhcodeConfig): FotohubClient | undefined {
+  if (!config.apiKey) {
+    stderr.write(`Not signed in to FOTOhub. Run ${bold("fhcode login")}.\n`);
+    return undefined;
+  }
+  return new FotohubClient({ apiKey: config.apiKey, baseUrl: config.baseUrl, userAgent: `fh-code/${VERSION}` });
+}
+
+async function assetsCommand(args: ParsedArgs): Promise<number> {
+  const [sub, ...rest] = args.rest;
+  if (sub === "pull") {
+    const [id, dir = path.join("assets", "fotohub")] = rest;
+    if (!id) throw new Error("Usage: fhcode assets pull <id> [dir]");
+    const asset = findAsset(id);
+    if (!asset) throw new Error(`No asset ${id}. fhcode assets lists them.`);
+    const target = path.resolve(args.cwd, dir);
+    mkdirSync(target, { recursive: true });
+    for (let i = 0; i < asset.urls.length; i++) {
+      const res = await fetch(asset.urls[i]);
+      if (!res.ok) throw new Error(`${asset.urls[i]}: HTTP ${res.status}${res.status === 403 || res.status === 404 ? " (generation links expire; generate again or keep copies with save_to_storage)" : ""}`);
+      const file = path.join(target, assetFileName(asset, i));
+      writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+      stdout.write(`${path.relative(args.cwd, file) || file}\n`);
+    }
+    return 0;
+  }
+  const assets = readAssets({ sinceDays: args.days, search: [sub, ...rest].filter(Boolean).join(" ") || undefined, cwd: args.project ? args.cwd : undefined });
+  if (args.outputFormat === "json") {
+    stdout.write(JSON.stringify(assets, null, 2) + "\n");
+    return 0;
+  }
+  if (!assets.length) {
+    stdout.write("No assets yet. Images, video, audio and 3D generated with FOTOhub's MCP tools in FH Code show up here.\n");
+    return 0;
+  }
+  const total = assets.reduce((n, a) => n + a.usd, 0);
+  stdout.write(`${bold(`${assets.length} FOTOhub assets`)} · $${fmt(total)}\n\n`);
+  for (const a of assets.slice(0, 50)) {
+    stdout.write(`${purple(a.id)}  ${a.kind.padEnd(5)} ${dim(a.ts.slice(0, 16).replace("T", " "))}  ${a.tool}${a.model ? ` · ${a.model}` : ""} · $${fmt(a.usd)}\n`);
+    if (a.prompt) stdout.write(`          ${dim(a.prompt.slice(0, 100))}\n`);
+    for (const u of a.urls) stdout.write(`          ${u}\n`);
+  }
+  if (assets.length > 50) stdout.write(dim(`\n… ${assets.length - 50} more; narrow with words or --days.\n`));
+  stdout.write(dim(`\nfhcode assets pull <id> downloads one into the project.\n`));
+  return 0;
+}
+
+async function modelsCommand(config: FhcodeConfig): Promise<number> {
+  stdout.write(describeModels() + "\n");
+  if (!config.apiKey) return 0;
+  // The live catalog lists more names than the chat endpoints route (Grok and others run on Agent Compute).
+  const client = clientFor(config)!;
+  const live = await client.listModels("text").catch(() => undefined);
+  if (!live?.length) return 0;
+  const known = new Set([...TEXT_MODELS.map((m) => m.id), ...COMPUTE_MODELS.flatMap((m) => (m.id ? [m.id] : []))]);
+  const extra = live.filter((m) => !known.has(m.id) && m.is_active !== false);
+  if (extra.length) {
+    stdout.write(`\n${bold("Also in your account's FOTOhub catalog")} ${dim("(GET /v1/models?category=text; not routed by the chat endpoints)")}\n`);
+    for (const m of extra) {
+      const price = m.input_price_per_1k_tokens != null ? ` · $${fmt(m.input_price_per_1k_tokens * 1000)}/$${fmt((m.output_price_per_1k_tokens ?? 0) * 1000)} per 1M` : "";
+      stdout.write(`- ${m.id}${m.name ? ` — ${m.name}` : ""}${m.provider ? ` (${m.provider})` : ""}${price}\n`);
+    }
+  }
+  return 0;
+}
+
+async function askCommand(args: ParsedArgs, config: FhcodeConfig): Promise<number> {
+  const [models, ...words] = args.rest;
+  const prompt = words.join(" ") || (stdin.isTTY ? "" : await readStdin());
+  if (!models || !prompt.trim()) throw new Error('Usage: fhcode ask <model>[,<model>...] "question"  (fhcode models lists them)');
+  const ids = models.split(",").map((m) => m.trim()).filter(Boolean);
+  for (const id of ids) if (!findTextModel(id)) throw new Error(`Unknown FOTOhub text model "${id}". fhcode models lists them.`);
+  const client = clientFor(config);
+  if (!client) return 1;
+  const answers = await compareModels(client, ids, prompt, { system: args.system, cwd: args.cwd });
+  let total = 0;
+  let failed = false;
+  for (const a of answers) {
+    if (ids.length > 1) stdout.write(`\n${bold(a.ok ? a.result.entry.name : a.model)}\n`);
+    if (!a.ok) {
+      failed = true;
+      stderr.write(`${red(a.error)}\n`);
+      continue;
+    }
+    total += a.result.usd;
+    stdout.write(`${a.result.text.trim()}\n`);
+  }
+  stderr.write(dim(`\nFOTOhub · ${ids.join(", ")} · $${fmt(total)}\n`));
+  return failed ? 1 : 0;
+}
+
+async function readStdin(): Promise<string> {
+  let text = "";
+  for await (const chunk of stdin) text += chunk;
+  return text;
 }
 
 async function account(which: "wallet" | "packages", config: FhcodeConfig): Promise<number> {

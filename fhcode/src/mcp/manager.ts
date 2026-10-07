@@ -5,6 +5,7 @@
  * agent FOTOhub's image, video, audio, 3D, storage and pricing tools.
  */
 
+import { recordMediaCall } from "../media.js";
 import { HttpTransport, McpClient, resultToText, StdioTransport, type McpToolInfo } from "./client.js";
 import { truncate, type Tool, type ToolKind } from "../tools/types.js";
 
@@ -120,6 +121,9 @@ export class McpManager {
         const result = await client.callTool(info.name, input, ctx.signal);
         const text = truncate(resultToText(result), 40_000);
         if (result.isError) throw new Error(text);
+        // FOTOhub generations bill the wallet outside the turn: count them and keep their assets.
+        const media = recordMediaCall({ name, input, text, cwd: ctx.cwd, source: "lite" });
+        if (media) ctx.guard?.recordMedia(media.result.usd);
         return text;
       },
     };

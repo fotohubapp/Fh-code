@@ -1,7 +1,7 @@
 {
   "name": "fh-code-ui",
-  "version": "0.1.0",
-  "description": "FH Code's look inside the engine: the FOTOhub API hero above the prompt, with a gradient wordmark, live wallet and quick actions, and the /fh command to show it again.",
+  "version": "0.2.0",
+  "description": "FH Code's look inside the engine: the FOTOhub strip above the prompt (wallet, session spend and budget, assets), the full FOTOhub API panel with /fh, /budget for the session's spend, and /login and /logout for the FOTOhub account.",
   "types": "./types/index.d.ts",
   "author": {
     "name": "FOTOhub",

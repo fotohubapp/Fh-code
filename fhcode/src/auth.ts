@@ -72,6 +72,7 @@ export async function browserLogin(options: BrowserLoginOptions = {}): Promise<L
       if (options.open !== false) openBrowser(url);
     });
     const checked = await saveKey(received.key, options.baseUrl);
+    if (received.email || received.plan) updateConfigFile({ account: { email: received.email, plan: received.plan } });
     return { ...checked, email: received.email, plan: received.plan };
   } finally {
     server.close();
@@ -81,12 +82,12 @@ export async function browserLogin(options: BrowserLoginOptions = {}): Promise<L
 /** Checks a key against the wallet and saves it. */
 export async function saveKey(apiKey: string, baseUrl?: string): Promise<LoginResult> {
   const balance = await new FotohubClient({ apiKey, baseUrl, userAgent: `fh-code/${VERSION}` }).getBalance();
-  updateConfigFile({ apiKey });
+  updateConfigFile({ apiKey, account: undefined });
   return { apiKey, balanceUsd: balance.wallet?.balance_usd };
 }
 
 export function logout(): void {
-  updateConfigFile({ apiKey: undefined });
+  updateConfigFile({ apiKey: undefined, account: undefined });
 }
 
 async function listenOnFreePort(server: http.Server, [from, to]: readonly [number, number]): Promise<number> {

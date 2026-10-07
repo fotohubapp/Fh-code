@@ -1,13 +1,15 @@
 # FH Code (FOTOhub Code)
 
-![FH Code: the FOTOhub API hero above the prompt](./docs/images/fhcode-hero.png)
+![FH Code: the FOTOhub API hero at the top of the terminal](./docs/images/fhcode-top-hero.png)
 
 FH Code is Claude Code running on the FOTOhub API. You get the same terminal interface, agents, plugins, MCP and hooks, but every turn is billed to the prepaid wallet of your [fotohub.app](https://fotohub.app) account, within that account's limits.
 
 On top of Claude Code, FH Code adds:
 
-- the FOTOhub look: the FOTOhub API hero above the prompt, a violet theme, a status line with the wallet, start-up notes and tips,
-- `/login` and `/logout` for your FOTOhub account (browser sign-in),
+- the FOTOhub look: the FOTOhub API hero at the top of the terminal, a violet theme, a status line with the wallet, start-up notes and tips,
+- `/login` and `/logout` for your FOTOhub account (browser sign-in), and `/budget` for the session's spend,
+- FOTOhub's other text models: Gemini, GPT-5.1 and Nova for second opinions, comparisons and copy (`/fotohub:ask`, `/fotohub:compare`, `/fotohub:second-opinion`, `fhcode ask`), and the Agent Compute models (Grok, DeepSeek, Kimi, Qwen) in `fhcode models`,
+- media spend tracking and an asset library for everything generated (`fhcode assets`),
 - design mode (`/fotohub:design`): stunning sites with original imagery from FOTOhub's 40+ image models, plus brand kits and web asset sets,
 - the built-in `fotohub` plugin: skills, `/fotohub:*` commands and agents for building on the FOTOhub API,
 - code intelligence: language servers for TS/JS, Python, Go, Rust and PHP, with `fhcode doctor` and `fhcode setup` for every dependency,
@@ -26,11 +28,13 @@ cd your-project && fhcode
 | Area | In FH Code |
 |------|------------|
 | Coding | The full Claude Code terminal experience, on FOTOhub models (Sonnet 4.6, 4.5, 4, Haiku 4.5), with diagnostics from language servers after every edit |
+| Other models | Gemini 2.5 Flash/Pro, GPT-5.1, Nova and Claude chat through `fotohub_ask_model` and `fotohub_compare_models`; Agent Compute models listed by `fhcode models` |
+| Media | Every FOTOhub generation counted in the session, the ledger and the asset library (`fhcode assets`, dashboard gallery) |
 | Design | `/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, and the "FOTOhub Design" output style |
 | Agents | Claude Code subagents, plus the FH Code hub: `fhcode agents run`, `fhcode hub` dashboard |
 | FOTOhub | Built-in `fotohub` MCP server; `fh-code` MCP server with docs.fotohub.app, wallet, packages and hub |
 | Integrations | Any MCP server, and plugins from the `fh-code-plugins` marketplace (this repository) |
-| Account | Wallet, monthly limit and session budget checked before every turn; cost in the status line |
+| Account | Wallet, monthly limit and session budget (`/budget`) checked before every turn; cost in the status line |
 | Updates | `fhcode update` from FOTOhub releases |
 | IDE | `fhcode gateway` for the Claude Code IDE extensions |
 | No engine? | `fhcode lite`: FH Code's own agent |

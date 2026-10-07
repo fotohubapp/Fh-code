@@ -12,20 +12,21 @@ import { resolveConfig } from "../config.js";
 import { packagesTool, topupTool, walletTool } from "../tools/account.js";
 import { DEFAULT_DOCS_SOURCE, docsReadTool, docsSearchTool } from "../tools/docs.js";
 import { hubTools } from "../tools/hub.js";
+import { askModelTool, assetsTool, compareModelsTool, modelsTool } from "../tools/models.js";
 import type { Tool, ToolContext } from "../tools/types.js";
 import { VERSION } from "../version.js";
 import { PROTOCOL_VERSION } from "./client.js";
 
 export async function serveMcp(cwd: string): Promise<number> {
   const config = resolveConfig();
-  const tools: Tool[] = [docsSearchTool, docsReadTool];
+  const tools: Tool[] = [docsSearchTool, docsReadTool, modelsTool, assetsTool];
   let ctx: ToolContext | undefined;
   if (config.apiKey) {
     const client = new FotohubClient({ apiKey: config.apiKey, baseUrl: config.baseUrl, userAgent: `fh-code/${VERSION}` });
     const guard = new AccountGuard({
       provider: config.accountLimitsUrl ? new HttpAccountProvider(config.accountLimitsUrl, config.apiKey) : new FotohubApiAccountProvider(client),
     });
-    tools.push(walletTool, packagesTool, topupTool);
+    tools.push(walletTool, packagesTool, topupTool, askModelTool, compareModelsTool);
     ctx = { cwd, client, guard, docsBaseUrl: (config.docsSource ?? DEFAULT_DOCS_SOURCE).replace(/\/+$/, ""), fetch };
   }
   const hubAllowed = !process.env.FHCODE_HUB_AGENT_ID;
@@ -58,7 +59,7 @@ export async function serveMcp(cwd: string): Promise<number> {
           capabilities: { tools: {} },
           serverInfo: { name: "fh-code", version: VERSION },
           instructions:
-            "FH Code tools: search and read docs.fotohub.app before writing code against the FOTOhub API; check the FOTOhub wallet and top-up packages; run background agents in the FH Code hub.",
+            "FH Code tools: search and read docs.fotohub.app before writing code against the FOTOhub API; check the FOTOhub wallet and top-up packages; ask other FOTOhub text models (Gemini, GPT-5.1, Nova) for a second opinion or copy; find assets generated earlier before generating again; run background agents in the FH Code hub.",
         });
         break;
       case "ping":

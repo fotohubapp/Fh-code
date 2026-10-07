@@ -88,6 +88,48 @@ export interface TopupCheckout {
   [key: string]: unknown;
 }
 
+export interface ChatRequest {
+  model: string;
+  /** "chat" for /v1/ai/chat/completions, "premium" for /v1/ai/chat/claude. */
+  endpoint: "chat" | "premium";
+  messages: { role: "user" | "assistant"; content: string }[];
+  system?: string;
+  /** Premium endpoint only; the OpenAI-compatible one ignores them. */
+  maxTokens?: number;
+  temperature?: number;
+}
+
+export interface ChatResult {
+  model: string;
+  text: string;
+  /** What FOTOhub charged, in USD. */
+  usd: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+interface RawChatResponse {
+  model?: string;
+  usd_charged?: number;
+  billing?: { usd_charged?: number; cost_breakdown?: { cost_usd?: number } };
+  choices?: { message?: { content?: string | { text?: string }[] } }[];
+  usage?: { input_tokens?: number; output_tokens?: number; prompt_tokens?: number; completion_tokens?: number };
+}
+
+export interface CatalogModel {
+  id: string;
+  name?: string;
+  provider?: string;
+  category?: string;
+  description?: string;
+  pricing_type?: string;
+  input_price_per_1k_tokens?: number | null;
+  output_price_per_1k_tokens?: number | null;
+  request_price?: number | null;
+  context_window?: number | null;
+  is_active?: boolean;
+}
+
 export interface FotohubClientOptions {
   apiKey: string;
   baseUrl?: string;
@@ -139,6 +181,53 @@ export class FotohubClient {
     const body: Record<string, unknown> = { amount_usd: amountUsd };
     if (payCurrency) body.pay_currency = payCurrency;
     return this.json<TopupCheckout>("POST", "/v1/tiers/wallet/topup", body, signal);
+  }
+
+  /**
+   * One chat completion on a FOTOhub text model (no tools, no streaming).
+   * Gemini, GPT and the "claude-sonnet" alias go to the OpenAI-compatible
+   * /v1/ai/chat/completions; Nova and dotted Claude ids to the premium
+   * /v1/ai/chat/claude (docs.fotohub.app/api/chat-llm).
+   */
+  async chat(request: ChatRequest, signal?: AbortSignal): Promise<ChatResult> {
+    const premium = request.endpoint === "premium";
+    const body: Record<string, unknown> = premium
+      ? {
+          model: request.model,
+          messages: request.messages,
+          ...(request.system ? { system: request.system } : {}),
+          ...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
+          ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+        }
+      : {
+          model: request.model,
+          // This endpoint reads only model and messages; the system prompt is a message.
+          messages: [...(request.system ? [{ role: "system", content: request.system }] : []), ...request.messages],
+        };
+    const res = await this.json<RawChatResponse>("POST", premium ? "/v1/ai/chat/claude" : "/v1/ai/chat/completions", body, signal);
+    const billing = res.billing ?? {};
+    const usd =
+      typeof billing.usd_charged === "number" && billing.usd_charged > 0
+        ? billing.usd_charged
+        : typeof billing.cost_breakdown?.cost_usd === "number"
+          ? billing.cost_breakdown.cost_usd
+          : typeof res.usd_charged === "number"
+            ? res.usd_charged
+            : 0;
+    const content = res.choices?.[0]?.message?.content;
+    return {
+      model: res.model ?? request.model,
+      text: typeof content === "string" ? content : Array.isArray(content) ? content.map((c) => (typeof c?.text === "string" ? c.text : "")).join("") : "",
+      usd,
+      inputTokens: res.usage?.input_tokens ?? res.usage?.prompt_tokens ?? 0,
+      outputTokens: res.usage?.output_tokens ?? res.usage?.completion_tokens ?? 0,
+    };
+  }
+
+  /** The model catalog, e.g. category "text" (a display catalog: more names than the chat endpoints route). */
+  async listModels(category?: string, signal?: AbortSignal): Promise<CatalogModel[]> {
+    const res = await this.json<{ models?: CatalogModel[] } | CatalogModel[]>("GET", `/v1/models${category ? `?category=${encodeURIComponent(category)}` : ""}`, undefined, signal);
+    return Array.isArray(res) ? res : (res.models ?? []);
   }
 
   private async json<T>(method: string, path: string, body: unknown, signal?: AbortSignal): Promise<T> {

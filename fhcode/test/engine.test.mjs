@@ -127,9 +127,11 @@ test("fhcode runs the Claude Code engine on the FOTOhub API, with FOTOhub MCP", 
   writeFileSync(path.join(ws, "hello.txt"), "hello from the workspace\n");
   const api = await startMockApi({
     respond: async (body) => {
-      const last = body.messages.at(-1);
-      const hasResult = Array.isArray(last.content) && last.content.some((b) => b.type === "tool_result");
-      if (!hasResult) return { frames: [{ type: "tool_use", id: "toolu_e1", name: "Read", input: { file_path: path.join(ws, "hello.txt") } }, done("tool_use", 0.004)] };
+      const results = body.messages.flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((b) => b.type === "tool_result").length;
+      // Side requests of the engine (titles, summaries) carry no tools.
+      if (!body.tools?.length) return text("FH Code session", 0);
+      if (results === 0) return { frames: [{ type: "tool_use", id: "toolu_e1", name: "Read", input: { file_path: path.join(ws, "hello.txt") } }, done("tool_use", 0.004)] };
+      if (results === 1) return { frames: [{ type: "tool_use", id: "toolu_e2", name: "mcp__fotohub__generate_image", input: { prompt: "hello banner" } }, done("tool_use", 0.004)] };
       return text("The file says hello.", 0.003);
     },
   });
@@ -146,7 +148,7 @@ test("fhcode runs the Claude Code engine on the FOTOhub API, with FOTOhub MCP", 
   };
   try {
     const out = await new Promise((resolve) => {
-      const child = spawn(process.execPath, [bin, "-p", "Read hello.txt", "--output-format", "stream-json", "--verbose", "--allowedTools", "Read"], {
+      const child = spawn(process.execPath, [bin, "-p", "Read hello.txt", "--output-format", "stream-json", "--verbose", "--allowedTools", "Read,mcp__fotohub__generate_image"], {
         cwd: ws,
         env,
         stdio: ["ignore", "pipe", "pipe"],
@@ -160,15 +162,23 @@ test("fhcode runs the Claude Code engine on the FOTOhub API, with FOTOhub MCP", 
     const init = events.find((e) => e.type === "system" && e.subtype === "init");
     assert.ok(init.tools.includes("mcp__fotohub__check_balance"), "FOTOhub MCP tools reach the engine");
     assert.ok(init.tools.includes("mcp__fh-code__fotohub_docs_search"), "FH Code MCP tools reach the engine");
+    for (const tool of ["mcp__fh-code__fotohub_ask_model", "mcp__fh-code__fotohub_compare_models", "mcp__fh-code__fotohub_assets", "mcp__fh-code__fotohub_models"]) {
+      assert.ok(init.tools.includes(tool), `${tool} reaches the engine`);
+    }
     assert.ok(init.plugins?.some((p) => p.name === "fotohub"), `bundled fotohub plugin loads: ${JSON.stringify(init.plugins)}`);
     assert.ok(init.slash_commands?.some((c) => c.startsWith("fotohub:")), "fotohub commands reach the engine");
-    for (const cmd of ["fotohub:design", "fotohub:brand", "fotohub:assets", "feature-dev:feature-dev", "commit-commands:commit"]) {
+    for (const cmd of ["fotohub:design", "fotohub:brand", "fotohub:assets", "fotohub:ask", "fotohub:second-opinion", "feature-dev:feature-dev", "commit-commands:commit"]) {
       assert.ok(init.slash_commands.includes(cmd), `${cmd} reaches the engine`);
     }
     for (const plugin of ["fh-code-ui", "code-review", "pr-review-toolkit"]) assert.ok(init.plugins.some((p) => p.name === plugin), `${plugin} loads`);
     assert.ok(events.some((e) => e.type === "user" && JSON.stringify(e).includes("hello from the workspace")), "the engine ran its Read tool");
     assert.equal(events.find((e) => e.type === "result").result, "The file says hello.");
-    assert.deepEqual(events.at(-1), { type: "fh_billing", sessionUsd: 0.007, turns: 2 });
+    // Three agent turns plus the generation FOTOhub billed through its MCP tool.
+    assert.deepEqual(events.at(-1), { type: "fh_billing", sessionUsd: 0.0425, mediaUsd: 0.0315, turns: 3, mediaCalls: 1, assets: 1 });
+    const assets = readFileSync(path.join(home, ".fhcode", "assets.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    assert.equal(assets.length, 1);
+    assert.equal(assets[0].prompt, "hello banner");
+    assert.equal(assets[0].cwd, ws);
     // No Anthropic attribution line reaches FOTOhub, and the engine's state stays in FH Code's home.
     assert.ok(!api.agentRequests()[0].body.system.includes("x-anthropic-billing-header"));
     const settings = JSON.parse(readFileSync(path.join(home, ".fhcode", "engine", "settings.json"), "utf8"));

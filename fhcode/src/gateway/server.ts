@@ -6,7 +6,12 @@
  *   POST /v1/messages               streamed or not, translated to /v1/ai/agent/stream
  *   POST /v1/messages/count_tokens  estimate
  *   GET  /v1/models                 the FOTOhub models, for the /model picker
- *   GET  /fh/status                 wallet and session spend, for the status line
+ *   GET  /fh/status                 wallet, session spend and budget, for the status line and the mod
+ *   POST /fh/budget                 {usd} sets the session budget, {usd: null} clears it (/budget)
+ *
+ * It also reads the results of FOTOhub MCP tools as the engine sends them
+ * back, so generations billed outside the agent turn count toward the
+ * session's spend and budget and land in the asset library (media.ts).
  *
  * It listens on 127.0.0.1 and accepts only its own random token, so nothing
  * else on the machine can spend through it.
@@ -18,8 +23,24 @@ import { gunzipSync, inflateSync, brotliDecompressSync } from "node:zlib";
 import { AccountGuard, AccountLimitError, fmt, FotohubApiAccountProvider, TOPUP_URL, type AccountProvider } from "../account/guard.js";
 import { FotohubClient } from "../api/client.js";
 import { FotohubApiError, InsufficientFundsError, RateLimitError } from "../api/errors.js";
+import { FOTOHUB_TOOL_PREFIX, parseMediaResult, recordMediaCall, type MediaCall } from "../media.js";
 import { VERSION } from "../version.js";
-import { anthropicError, anthropicStopReason, AnthropicStreamWriter, ENGINE_MODELS, toFotohubRequest, type AnthropicRequest } from "./translate.js";
+import {
+  anthropicError,
+  anthropicStopReason,
+  AnthropicStreamWriter,
+  compatRequest,
+  ENGINE_MODELS,
+  flattenToolResult,
+  toFotohubRequest,
+  type AnthropicRequest,
+} from "./translate.js";
+
+/** fotohub_ask_model and fotohub_compare_models of the fh-code MCP server. */
+const TEXT_MODEL_TOOL = /^mcp__fh-code__fotohub_(ask|compare)_models?$/;
+
+/** Below this wallet balance, /fh/status reports lowBalance and the mod warns once. */
+export const LOW_BALANCE_USD = 1;
 
 export interface GatewayOptions {
   apiKey: string;
@@ -37,13 +58,17 @@ export interface GatewayOptions {
   fetch?: typeof fetch;
   /** Called after every billed turn. */
   onTurn?: (info: { model: string; chargedUsd: number; sessionUsd: number; inputTokens: number; outputTokens: number }) => void;
+  /** Called for every FOTOhub MCP result that cost money or made an asset, once per tool call. */
+  onMedia?: (call: MediaCall) => void;
+  /** Workspace of the session, recorded with its assets. */
+  cwd?: string;
 }
 
 export interface Gateway {
   url: string;
   token: string;
   guard: AccountGuard;
-  stats: { turns: number; inputTokens: number; outputTokens: number };
+  stats: { turns: number; inputTokens: number; outputTokens: number; mediaCalls: number; assets: number; compat: boolean };
   close(): Promise<void>;
 }
 
@@ -72,7 +97,65 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
     provider: options.accountProvider ?? { getLimits: (signal) => new FotohubApiAccountProvider(activeClient() ?? client).getLimits(signal) },
     sessionBudgetUsd: options.maxBudgetUsd,
   });
-  const stats = { turns: 0, inputTokens: 0, outputTokens: 0 };
+  const stats = { turns: 0, inputTokens: 0, outputTokens: 0, mediaCalls: 0, assets: 0, compat: false };
+  const seenCalls = new Set<string>();
+
+  /**
+   * FOTOhub MCP results arrive as tool_result blocks in the newest user
+   * message, answering tool_use blocks of the assistant message before it.
+   * Only that message is read, so resuming a session does not count old
+   * generations again, and seenCalls drops a retried request.
+   */
+  function noteMediaResults(messages: AnthropicRequest["messages"]): void {
+    const last = messages?.[messages.length - 1];
+    if (!last || last.role !== "user" || typeof last.content === "string") return;
+    const results = last.content.filter((b) => b.type === "tool_result" && !seenCalls.has(String(b.tool_use_id)));
+    if (!results.length) return;
+    const uses = new Map<string, { name: string; input?: Record<string, unknown> }>();
+    for (const m of messages!.slice(-3, -1)) {
+      if (m.role !== "assistant" || typeof m.content === "string") continue;
+      for (const b of m.content) if (b.type === "tool_use") uses.set(String(b.id), { name: String(b.name), input: b.input as Record<string, unknown> });
+    }
+    for (const r of results) {
+      const id = String(r.tool_use_id);
+      const use = uses.get(id);
+      if (use && TEXT_MODEL_TOOL.test(use.name) && r.is_error !== true) {
+        // FH Code's own text-model tools: already in the ledger (models.ts); count the session spend.
+        seenCalls.add(id);
+        guard.recordMedia(parseMediaResult(flattenToolResult(r.content))?.usd ?? 0);
+        continue;
+      }
+      if (!use?.name.startsWith(FOTOHUB_TOOL_PREFIX)) continue;
+      seenCalls.add(id);
+      const call: MediaCall = { name: use.name, input: use.input, text: flattenToolResult(r.content), isError: r.is_error === true, id, cwd: options.cwd };
+      const seen = recordMediaCall(call, false);
+      if (!seen) continue;
+      stats.mediaCalls++;
+      if (seen.asset) stats.assets++;
+      guard.recordMedia(seen.result.usd);
+      // The result names the balance after the call; fetch it fresh next time.
+      if (seen.result.walletUsd !== undefined) guard.invalidate();
+      options.onMedia?.(call);
+    }
+  }
+
+  async function status() {
+    const base = {
+      sessionUsd: guard.sessionSpentUsd,
+      mediaUsd: guard.sessionMediaUsd,
+      turns: stats.turns,
+      assets: stats.assets,
+      budgetUsd: guard.budgetUsd ?? null,
+    };
+    if (!activeClient()) return { ...base, signedIn: false, balanceUsd: null, lowBalance: false, display: "FH Code · not signed in to FOTOhub (/login)" };
+    const balance = await guard.estimatedBalance().catch(() => null);
+    const parts = [
+      `wallet ${balance === null ? "?" : `$${fmt(balance)}`}`,
+      `session $${fmt(guard.sessionSpentUsd)}${guard.budgetUsd !== undefined ? ` of $${fmt(guard.budgetUsd)}` : ""}`,
+      ...(stats.assets ? [`${stats.assets} asset${stats.assets === 1 ? "" : "s"}`] : []),
+    ];
+    return { ...base, signedIn: true, balanceUsd: balance, lowBalance: balance !== null && balance < LOW_BALANCE_USD, display: `FH Code · ${parts.join(" · ")}` };
+  }
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
@@ -89,16 +172,16 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
     if (auth !== token) return fail(401, "This FH Code gateway only accepts requests from its own FH Code session.");
 
     try {
-      if (req.method === "GET" && url.pathname === "/fh/status") {
-        if (!activeClient()) return json(200, { signedIn: false, balanceUsd: null, sessionUsd: guard.sessionSpentUsd, turns: stats.turns, display: "FH Code · not signed in to FOTOhub (/login)" });
-        const balance = await guard.estimatedBalance().catch(() => null);
-        return json(200, {
-          signedIn: true,
-          balanceUsd: balance,
-          sessionUsd: guard.sessionSpentUsd,
-          turns: stats.turns,
-          display: `FH Code · wallet ${balance === null ? "?" : `$${fmt(balance)}`} · session $${fmt(guard.sessionSpentUsd)}`,
-        });
+      if (req.method === "GET" && url.pathname === "/fh/status") return json(200, await status());
+      if (req.method === "POST" && url.pathname === "/fh/budget") {
+        const { usd } = JSON.parse((await readBody(req)) || "{}") as { usd?: unknown };
+        const value = usd === null || usd === undefined || usd === "off" ? undefined : Number(usd);
+        try {
+          guard.setBudget(value);
+        } catch (err) {
+          return fail(400, (err as Error).message);
+        }
+        return json(200, await status());
       }
       if (req.method === "GET" && url.pathname === "/v1/models") {
         return json(200, {
@@ -130,6 +213,7 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       if (!res.writableEnded) controller.abort();
     });
 
+    noteMediaResults(body.messages);
     const fh = activeClient();
     if (!fh) {
       const e = anthropicError(401, "Not signed in to FOTOhub. Run /login to sign in to your FOTOhub account.");
@@ -146,7 +230,8 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       return;
     }
 
-    const fhReq = toFotohubRequest(body, options.defaultModel);
+    const fullReq = toFotohubRequest(body, options.defaultModel);
+    let fhReq = stats.compat ? compatRequest(fullReq) : fullReq;
     const stream = body.stream === true;
     const messageId = `msg_fh_${randomBytes(12).toString("hex")}`;
     const model = body.model ?? fhReq.model;
@@ -174,20 +259,33 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       let usage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
       // The first frame decides whether the request worked, so HTTP errors from
       // FOTOhub are still reported as HTTP errors to the engine.
-      for await (const frame of fh.agentStream(fhReq, controller.signal)) {
-        begin();
-        if (frame.type === "text_delta") writer!.text(frame.text);
-        else if (frame.type === "tool_use") writer!.toolUse(frame.id, frame.name, frame.input ?? {});
-        else if (frame.type === "done") {
-          stopReason = anthropicStopReason(frame.stop_reason);
-          usage = { ...usage, input_tokens: frame.usage?.input_tokens ?? 0, output_tokens: frame.usage?.output_tokens ?? 0 };
-          const charged = guard.record(frame.billing);
-          stats.turns++;
-          stats.inputTokens += usage.input_tokens;
-          stats.outputTokens += usage.output_tokens;
-          options.onTurn?.({ model: fhReq.model, chargedUsd: charged, sessionUsd: guard.sessionSpentUsd, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens });
-        } else if (frame.type === "error") {
-          throw new Error(frame.message);
+      for (;;) {
+        try {
+          for await (const frame of fh.agentStream(fhReq, controller.signal)) {
+            begin();
+            if (frame.type === "text_delta") writer!.text(frame.text);
+            else if (frame.type === "tool_use") writer!.toolUse(frame.id, frame.name, frame.input ?? {});
+            else if (frame.type === "done") {
+              stopReason = anthropicStopReason(frame.stop_reason);
+              usage = { ...usage, input_tokens: frame.usage?.input_tokens ?? 0, output_tokens: frame.usage?.output_tokens ?? 0 };
+              const charged = guard.record(frame.billing);
+              stats.turns++;
+              stats.inputTokens += usage.input_tokens;
+              stats.outputTokens += usage.output_tokens;
+              options.onTurn?.({ model: fhReq.model, chargedUsd: charged, sessionUsd: guard.sessionSpentUsd, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens });
+            } else if (frame.type === "error") {
+              throw new Error(frame.message);
+            }
+          }
+          break;
+        } catch (err) {
+          // FOTOhub refused the request's shape before answering: retry once with
+          // only the documented fields, and keep doing so for this session.
+          const rejected = err instanceof FotohubApiError && (err.status === 400 || err.status === 422) && !(err instanceof InsufficientFundsError);
+          const reduced = rejected && !started && !stats.compat ? compatRequest(fullReq) : undefined;
+          if (!reduced || JSON.stringify(reduced) === JSON.stringify(fhReq)) throw err;
+          stats.compat = true;
+          fhReq = reduced;
         }
       }
       begin();

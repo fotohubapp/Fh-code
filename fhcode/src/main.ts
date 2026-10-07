@@ -4,6 +4,7 @@
  *   fhcode [claude args...]   the Claude Code engine on the FOTOhub API (default)
  *   fhcode lite [...]         FH Code's built-in agent
  *   fhcode login | logout | wallet | packages | docs | agents | hub | sessions | update
+ *   fhcode usage | models | ask | assets | doctor | setup
  *   fhcode gateway            only the gateway, for IDE extensions and other clients
  *   fhcode engine [...]       the engine with the gateway but without FH Code's session flags
  */
@@ -21,7 +22,7 @@ import { recordUsage } from "./usage.js";
 import { VERSION } from "./version.js";
 
 /** Subcommands FH Code handles itself; everything else goes to the engine. */
-const OWN = new Set(["login", "logout", "wallet", "packages", "docs", "agents", "hub", "sessions", "update", "usage", "doctor", "setup"]);
+const OWN = new Set(["login", "logout", "wallet", "packages", "docs", "agents", "hub", "sessions", "update", "usage", "doctor", "setup", "assets", "models", "ask"]);
 
 const HELP = `FH Code ${VERSION} — FOTOhub Code
 
@@ -33,7 +34,10 @@ const HELP = `FH Code ${VERSION} — FOTOhub Code
   fhcode login                 sign in to your FOTOhub account (browser); --manual to paste a key
   fhcode logout                sign out of FOTOhub
   fhcode wallet | packages     FOTOhub wallet, limits and top-up packages
-  fhcode usage [--days 30]     what FH Code spent: by day, model, project
+  fhcode usage [--days 30]     what FH Code spent: by day, model, project, source (engine, media, chat)
+  fhcode models                FOTOhub text models: Claude (agent), Gemini, GPT-5.1, Nova (chat), Agent Compute
+  fhcode ask <model> "..."     ask a FOTOhub text model; gemini-pro,gpt-4o "..." compares several
+  fhcode assets [words]        images, video, audio, 3D generated in FH Code; assets pull <id> [dir]
   fhcode docs <query>          search docs.fotohub.app
   fhcode agents run "prompt"   background agent;  fhcode agents [logs|send|stop] <id>
   fhcode hub                   agent hub dashboard in the browser

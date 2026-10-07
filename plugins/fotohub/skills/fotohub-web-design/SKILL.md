@@ -50,6 +50,7 @@ Make a table with one row per asset, and include favicon, app icon and OG image:
 
 ## 4. Generate and process
 
+- **Reuse first.** Search `fotohub_assets` (fh-code MCP) for images made earlier in this project or for this brand; reusing one is free. Generation links can expire, so download what the page uses into the project.
 - **Generation.** Generate with `mcp__fotohub__generate_image`, with the size tier always set. For many assets, hand independent batches to subagents in parallel.
 - **Async jobs.** Poll `get_job_status`. IDA Q and video are async.
 - **Post-processing:**

@@ -27,6 +27,13 @@ export interface FhcodeConfig {
   updateUrl?: string;
   /** Hard cap per session in USD. */
   maxBudgetUsd?: number;
+  /** The signed-in FOTOhub account, as fotohub.app reported it at sign-in; for display. */
+  account?: { email?: string; plan?: string };
+  /**
+   * Run the engine in its fullscreen layout. Off by default: on the main
+   * screen FH Code's FOTOhub API hero stays at the top, above the engine.
+   */
+  fullscreen?: boolean;
 }
 
 export const CONFIG_DIR = process.env.FHCODE_CONFIG_DIR || path.join(os.homedir(), ".fhcode");
@@ -70,6 +77,8 @@ export function resolveConfig(flags: Partial<FhcodeConfig> = {}): FhcodeConfig {
     accountLimitsUrl: flags.accountLimitsUrl || env.FHCODE_ACCOUNT_LIMITS_URL || file.accountLimitsUrl,
     updateUrl: flags.updateUrl || env.FHCODE_UPDATE_URL || file.updateUrl || DEFAULT_UPDATE_URL,
     maxBudgetUsd: budget,
+    account: file.account,
+    fullscreen: flags.fullscreen ?? (env.FHCODE_FULLSCREEN ? env.FHCODE_FULLSCREEN === "1" : file.fullscreen),
   };
 }
 

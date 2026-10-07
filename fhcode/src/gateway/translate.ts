@@ -120,7 +120,7 @@ function convertBlocks(blocks: AnyBlock[]): ContentBlock[] {
   return out;
 }
 
-function flattenToolResult(content: unknown): string {
+export function flattenToolResult(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return content === undefined ? "" : JSON.stringify(content);
   return (content as AnyBlock[])
@@ -235,4 +235,30 @@ export function anthropicError(status: number, message: string): { status: numbe
                 ? "overloaded_error"
                 : "api_error";
   return { status, body: { type: "error", error: { type, message } } };
+}
+
+/**
+ * The same turn with only the fields the FOTOhub agent endpoint documents:
+ * no max_tokens or temperature, images as a note, no is_error. The gateway
+ * falls back to it when FOTOhub rejects a request as malformed, and keeps
+ * using it for the rest of the session.
+ */
+export function compatRequest(req: AgentTurnRequest & { max_tokens?: number; temperature?: number }): AgentTurnRequest {
+  const { max_tokens: _max, temperature: _temp, ...rest } = req;
+  return {
+    ...rest,
+    messages: rest.messages.map((m) => {
+      if (typeof m.content === "string") return m;
+      const content = m.content.map((b) => {
+        const block = b as unknown as AnyBlock;
+        if (block.type === "image") return { type: "text", text: "[image omitted: not accepted by the FOTOhub agent endpoint]" } as ContentBlock;
+        if (block.type === "tool_result" && "is_error" in block) {
+          const { is_error, ...plain } = block;
+          return { ...plain, content: is_error ? `Error: ${String(plain.content)}` : plain.content } as unknown as ContentBlock;
+        }
+        return b;
+      });
+      return { ...m, content };
+    }),
+  };
 }

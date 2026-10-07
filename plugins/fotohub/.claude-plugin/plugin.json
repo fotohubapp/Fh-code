@@ -1,7 +1,7 @@
 {
   "name": "fotohub",
-  "version": "1.1.0",
-  "description": "FOTOhub for FH Code: FOTOhub API integration, design mode for stunning websites with FOTOhub-generated imagery (40+ image models), brand kits and asset sets, media generation with FOTOhub's MCP tools, and commerce integrations.",
+  "version": "1.2.0",
+  "description": "FOTOhub for FH Code: FOTOhub API integration, design mode for stunning websites with FOTOhub-generated imagery (40+ image models), brand kits and asset sets, media generation with FOTOhub's MCP tools and an asset library, other FOTOhub text models (Gemini, GPT-5.1, Nova) for second opinions, and commerce integrations.",
   "author": {
     "name": "FOTOhub",
     "email": "dev@fotohub.app"

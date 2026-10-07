@@ -12,11 +12,15 @@ line and MCP servers. `fhcode lite` is FH Code's own agent (`src/agent/`).
 Two plugins ship inside FH Code and load in every engine session:
 `plugins/fotohub` (skills, commands, agents and the "FOTOhub Design" output
 style for the FOTOhub API and design mode) and
-`plugins/fh-code-ui` (a mod drawing the FOTOhub API header above the prompt and
-answering /login and /logout for the FOTOhub account; test
+`plugins/fh-code-ui` (a mod drawing the FOTOhub strip and panel above the prompt
+and answering /login, /logout and /budget; test
 it with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test plugins/fh-code-ui`).
 The repository's feature-dev, code-review, commit-commands and pr-review-toolkit
-plugins ship inside FH Code too (`fhcode/scripts/copy-assets.mjs`). `src/deps.ts`
+plugins ship inside FH Code too (`fhcode/scripts/copy-assets.mjs`). FH Code draws the FOTOhub API hero at the top
+of the terminal itself (`src/engine/hero.ts`) and runs the engine on its
+main-screen layout, since the engine's own header cannot be replaced. The
+gateway reads FOTOhub MCP results for media spend and assets (`src/media.ts`);
+FOTOhub's other text models are in `src/models.ts`. `src/deps.ts`
 owns dependencies: `fhcode doctor`, `fhcode setup` and the generated fh-code-lsp plugin. Run `npm ci && npm test` in `fhcode/` after changing
 it; the tests run against a mock FOTOhub API and also load every plugin in
 `plugins/`, so a plugin change can break them. FOTOhub API details (endpoints,

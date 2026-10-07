@@ -18,7 +18,8 @@ FH Code adds these on top:
   - **`fhcode setup`** installs what is missing: the engine, the project's language servers, and the design tools with `--design`.
   - **Coding plugins ship built in:** feature-dev, code-review, commit-commands and pr-review-toolkit.
 - **The FOTOhub look.**
-  - **The FOTOhub API header.** It is always on screen above the prompt, with a violet-to-rose gradient wordmark, your account and the live wallet. It opens as a full panel with quick actions and stays as a compact header while you work; `/fh` toggles the full panel.
+  - **The FOTOhub API hero at the top.** FH Code draws it as the first thing in the terminal, before the engine starts: a violet-to-rose gradient wordmark, your account, the wallet, the model and quick actions. The engine runs on its main-screen layout, so the hero stays above the engine's own header and scrolls with the conversation. Set `"fullscreen": true` in `~/.fhcode/config.json` (or `FHCODE_FULLSCREEN=1`) for the engine's fullscreen layout, which clears the screen and so has no room for the hero.
+  - **A FOTOhub strip above the prompt.** One line with the wallet, the session's spend and budget, and how many assets the session made. `/fh` opens the full panel with quick actions. A low wallet turns it amber and shows a one-time warning.
   - **The FOTOhub theme.** A violet theme, with the mascot recoloured to match.
   - **A status line:** `FH Code · Sonnet 4.6 · wallet $42.50 · session $0.12`.
   - **FOTOhub start-up notes, tips and spinner words.**
@@ -27,13 +28,26 @@ FH Code adds these on top:
     - `fotohub-api` covers calling the API correctly: docs first, keys, 402 handling, webhooks and signatures, rate limits, and cost preflight.
     - `fotohub-generation` covers generating media in the session.
     - `fotohub-commerce` covers the store integrations.
-  - **Commands:** `/fotohub:integrate`, `/fotohub:generate` and `/fotohub:wallet`.
+    - `fotohub-text-models` covers which FOTOhub text model fits a task.
+  - **Commands:** `/fotohub:integrate`, `/fotohub:generate`, `/fotohub:wallet`, `/fotohub:ask`, `/fotohub:compare` and `/fotohub:second-opinion`.
   - **Agents:** `fotohub-integrator` and `fotohub-docs-expert`.
-- **FOTOhub integrations.** FOTOhub's MCP server is built in, with image, video, audio, 3D, storage, pricing and wallet tools. FH Code's own MCP server adds the docs.fotohub.app search and reader, the wallet, top-up packages and the agent hub.
+- **FOTOhub integrations.** FOTOhub's MCP server is built in, with image, video, audio, 3D, storage, pricing and wallet tools. FH Code's own MCP server adds the docs.fotohub.app search and reader, the wallet, top-up packages, other text models, the asset library and the agent hub.
+- **More FOTOhub text models.** The coding agent runs on FOTOhub's four Claude models, the ones its agent endpoint serves with tools. The other FOTOhub text models answer through `fotohub_ask_model` and `fotohub_compare_models`, `/fotohub:ask`, `/fotohub:compare`, and `fhcode ask`:
+  - Gemini 2.5 Flash and Pro, and GPT-5.1 (id `gpt-4o`), through `/v1/ai/chat/completions`;
+  - Amazon Nova (Micro, Lite, 2 Lite, Pro, Premier) and Claude, through `/v1/ai/chat/claude`.
+
+  Use them for a second opinion on your changes (`/fotohub:second-opinion`), copy in another voice, translation, or cheap bulk text. Grok 4.20, Gemini 3.1 Pro, DeepSeek v3.2, Kimi K2 and Qwen3 Max run on FOTOhub Agent Compute, as cloud agents. `fhcode models` lists them, plus the ids your account's live catalog reports.
+- **Media spend and an asset library.** FOTOhub's MCP tools bill the wallet themselves, outside the agent turn. The gateway reads their results as the engine sends them back, so each generation:
+  - counts toward the session's spend and budget,
+  - goes in the cost ledger,
+  - lands in the asset library (`~/.fhcode/assets.jsonl`) with its URLs, prompt, model and cost.
+
+  `fhcode assets` lists the library, `fhcode assets pull <id>` downloads an asset into the project, the dashboard shows a gallery, and the agent checks `fotohub_assets` before paying to generate again.
+- **`/budget`.** Caps what a session may spend, generations included (`/budget 5`, `/budget off`).
 - **An agent hub.**
   - Background agents (`fhcode agents`), with follow-ups that continue an agent's session (`fhcode agents send`).
   - A dashboard in the browser (`fhcode hub`).
-- **A cost ledger.** Every FOTOhub turn is recorded. `fhcode usage` sums it up by day, model, project and source, and the dashboard charts it.
+- **A cost ledger.** Every FOTOhub turn, generation and text-model question is recorded. `fhcode usage` sums it up by day, model, project and source (engine, hub, media, chat), and the dashboard charts it.
 - **Updates from FOTOhub.** `fhcode update` installs new releases, and the `fh-code-plugins` marketplace comes preconfigured.
 
 ## Install
@@ -66,7 +80,8 @@ Inside a session, everything works as in Claude Code. A few things are FOTOhub-s
   - Claude Sonnet 4
   - Claude Haiku 4.5
 - **`/login` and `/logout`** are your FOTOhub account's.
-- **`/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, `/fotohub:generate` and `/fotohub:integrate`** come with the bundled `fotohub` plugin, and so does the "FOTOhub Design" output style.
+- **`/budget <usd>`** caps this session's FOTOhub spend, generations included; `/budget off` removes the cap, and `/budget` shows it.
+- **`/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, `/fotohub:generate`, `/fotohub:integrate`, `/fotohub:ask`, `/fotohub:compare` and `/fotohub:second-opinion`** come with the bundled `fotohub` plugin, and so does the "FOTOhub Design" output style.
 - **`/plugin install <name>@fh-code-plugins`** installs more plugins from this repository's marketplace.
 - **The status line** shows the wallet balance and what this session has cost on FOTOhub.
 
@@ -78,7 +93,11 @@ Inside a session, everything works as in Claude Code. A few things are FOTOhub-s
 | `fhcode doctor` | Check the engine, git/gh/jq/python3, language servers, design tools, key, wallet, MCP and docs |
 | `fhcode setup [--design] [--all] [-y]` | Install what is missing: the engine, the project's language servers, and Playwright for design QA |
 | `fhcode wallet` / `packages` | Wallet balance, monthly limit, tier; top-up packages |
-| `fhcode usage [--days 30]` | What FH Code spent: by day, model, project, and interactive vs background |
+| `fhcode usage [--days 30]` | What FH Code spent: by day, model, project and source (engine, hub, media, chat) |
+| `fhcode models` | FOTOhub's text models: where each runs (coding agent, chat, Agent Compute) and its price, plus your account's live catalog |
+| `fhcode ask <model> "question"` | Ask a FOTOhub text model; `gemini-pro,gpt-4o "..."` asks several |
+| `fhcode assets [words] [--days n] [--project] [--json]` | The images, video, audio and 3D generated in FH Code |
+| `fhcode assets pull <id> [dir]` | Download an asset into the project (default `assets/fotohub`) |
 | `fhcode docs <query>` | Search docs.fotohub.app |
 | `fhcode agents run "prompt"` | Start a background agent (`--name`, `--mode`, `--allow-tool`) |
 | `fhcode agents` / `agents logs <id> [-f]` / `agents stop <id>` | Watch and steer background agents |
@@ -98,17 +117,19 @@ fhcode ─┬─ FH Code gateway  127.0.0.1:<random>, Anthropic Messages API, ra
         │      └─> POST https://apis.fotohub.app/v1/ai/agent/stream   (FOTOhub wallet)
         └─ claude  (CLAUDE_CONFIG_DIR=~/.fhcode/engine, ANTHROPIC_BASE_URL=gateway)
                ├─ MCP fotohub   https://apis.fotohub.app/mcp/
-               └─ MCP fh-code   fhcode mcp-serve  (docs.fotohub.app, wallet, packages, hub)
+               └─ MCP fh-code   fhcode mcp-serve  (docs.fotohub.app, wallet, packages, text models, assets, hub)
 ```
 
 - **The gateway** turns Messages API requests into FOTOhub agent turns and FOTOhub's frames back into the Messages API event stream. It handles both streaming and non-streaming requests, tool use, and errors.
   - **Removed before forwarding**, because the FOTOhub agent endpoint does not take them: prompt-caching markers, thinking blocks, server tools, and Anthropic's attribution line.
   - **Model mapping.** Model ids map onto FOTOhub's agent models. A model FOTOhub does not serve, such as Opus, runs on the default model.
+  - **Compatibility fallback.** If FOTOhub rejects a request's shape (HTTP 400 or 422) before answering, the gateway retries once with only the fields the agent endpoint documents. It drops `max_tokens` and `temperature`, turns images into a note, and folds `is_error` into the result text. It keeps doing so for the rest of the session.
+  - **Media results.** The gateway reads the results of `mcp__fotohub__*` tools in the newest message: the cost line and the asset URLs. Each tool call is counted once, and a resumed session does not count old generations again.
 - **Before every turn**, the gateway checks the account. It refuses the turn with a top-up link when:
   - the wallet is empty,
   - the monthly limit is reached, or
-  - the session budget (`FHCODE_MAX_BUDGET_USD`) is used up.
-- **Billing.** It records what FOTOhub charged for each turn. Headless runs with `--output-format stream-json` end with a line `{"type":"fh_billing","sessionUsd":…,"turns":…}`.
+  - the session budget (`/budget`, `FHCODE_MAX_BUDGET_USD`) is used up. Generations and text-model questions count toward it.
+- **Billing.** It records what FOTOhub charged for each turn. Headless runs with `--output-format stream-json` end with a line `{"type":"fh_billing","sessionUsd":…,"mediaUsd":…,"turns":…,"mediaCalls":…,"assets":…}`.
 - **Engine state.** The engine keeps its state (settings, sessions, plugins, theme) in `~/.fhcode/engine`, apart from any Claude Code install of your own. FH Code manages these keys of `settings.json`:
   - `statusLine`
   - `companyAnnouncements`
@@ -124,7 +145,7 @@ fhcode ─┬─ FH Code gateway  127.0.0.1:<random>, Anthropic Messages API, ra
 
   These features are not available through the FOTOhub endpoint.
 
-What stays Anthropic's: the engine is Anthropic's Claude Code, installed by you under Anthropic's terms. FH Code does not ship or modify it, so the start-up header's text and the mascot's shape are the engine's own.
+What stays Anthropic's: the engine is Anthropic's Claude Code, installed by you under Anthropic's terms. FH Code does not ship or modify it. The engine's start-up header, with its "Claude Code" title and the mascot's shape, is the engine's own. No setting or extension point replaces it. That is why FH Code draws its FOTOhub API hero above it.
 
 FH Code changes the rest through the engine's supported extension points:
 
@@ -166,6 +187,7 @@ To use account limits served by fotohub.app instead, set `FHCODE_ACCOUNT_LIMITS_
 | Account limits endpoint | `FHCODE_ACCOUNT_LIMITS_URL` | FOTOhub API |
 | Docs source | `FHCODE_DOCS_SOURCE` | markdown source of docs.fotohub.app |
 | Update channel | `FHCODE_UPDATE_URL` | GitHub releases of fotohubapp/Fh-code |
+| Engine layout | `FHCODE_FULLSCREEN=1` (or `CLAUDE_CODE_NO_FLICKER`) | main screen, with the FOTOhub hero at the top |
 | Disable the daily update check | `FHCODE_NO_UPDATE_CHECK=1` | |
 
 ## Updates

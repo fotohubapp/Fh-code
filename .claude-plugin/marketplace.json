@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "fotohub-code-plugins",
+  "name": "fh-code-plugins",
   "version": "1.0.0",
-  "description": "FOTOhub Code plugins including Agent SDK development tools, PR review toolkit, and commit workflows",
+  "description": "FH Code plugins including Agent SDK development tools, PR review toolkit, and commit workflows",
   "owner": {
     "name": "FOTOhub"
   },

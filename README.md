@@ -1,47 +1,40 @@
-# FOTOhub Code
+# FH Code (FOTOhub Code)
 
-FOTOhub Code is FOTOhub's coding agent. It lives in your terminal and works in your project: it reads and searches your code, edits files, runs commands and git, and looks up anything about the FOTOhub platform in [docs.fotohub.app](https://docs.fotohub.app). You drive it with plain language.
-
-FOTOhub Code runs on the FOTOhub API and bills the prepaid wallet of your [fotohub.app](https://fotohub.app) account, within that account's limits. The models are Claude models served by FOTOhub.
-
-## Get started
+FH Code is FOTOhub's coding and agent hub. One tool covers coding in your project, subagents and background agents you manage from one place, FOTOhub's AI tools over MCP, and integrations with any other MCP server or plugin. It runs on the FOTOhub API and bills the prepaid wallet of your [fotohub.app](https://fotohub.app) account, within that account's limits.
 
 ```bash
-npm install -g https://github.com/fotohubapp/Fh-code/releases/latest/download/fotohub-code.tgz
+npm install -g https://github.com/fotohubapp/Fh-code/releases/latest/download/fh-code.tgz
 fhcode login          # API key from https://fotohub.app/settings/api
 cd your-project
-fhcode
+fhcode                # code with the agent
+fhcode hub            # dashboard for background agents
 ```
 
-The [agent README](./agent/README.md) covers the rest:
+## What it does
 
-- commands and permission modes,
-- costs and account limits,
-- configuration,
-- updates, and
-- embedding the agent in FH Code.
+| Area | In FH Code |
+|------|------------|
+| Coding | Reads, searches and edits code, runs commands and tests, handles git, keeps sessions (`-c`, `-r`) |
+| Agents | `Task` subagents with their own context, run in parallel; custom agent definitions |
+| Agent hub | Background agents (`fhcode agents run`), a web dashboard (`fhcode hub`), and hub tools the agent itself can use |
+| FOTOhub | Built-in FOTOhub MCP: image, video, audio, 3D, storage, pricing and wallet tools. All of docs.fotohub.app is searchable |
+| Integrations | Any MCP server (`fhcode mcp add`), plugins from marketplaces (`fhcode plugin install`), hooks |
+| Account | Wallet, monthly limit and session budget checked before every turn; top-up packages from the Console |
+| Updates | `fhcode update` from FOTOhub releases |
+| Embedding | `import { FotohubCodeAgent } from "fh-code"` in FOTOhub apps |
+
+The full guide is in [fhcode/README.md](./fhcode/README.md).
 
 ## Repository layout
 
 | Path | Contents |
 |------|----------|
-| [`agent/`](./agent) | The FOTOhub Code agent (`fhcode`): CLI, library, tools, docs index, and tests |
-| [`plugins/`](./plugins) | Plugins for the Claude Code engine, published through [`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json) |
-| [`examples/`](./examples) | Example settings, hooks, MDM profiles, and gateway deployments for the Claude Code engine |
-| [`mods/`](./mods) | Function-hook plugins (mods) for the Claude Code engine |
+| [`fhcode/`](./fhcode) | FH Code: CLI, agent, hub, MCP client, plugin system, docs index and tests |
+| [`plugins/`](./plugins) | FH Code plugins, published as the `fh-code-plugins` marketplace ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)) |
+| [`examples/`](./examples) | Example settings, hooks, MDM profiles and gateway deployments |
+| [`mods/`](./mods) | Function-hook mods |
 | [`.devcontainer/`](./.devcontainer) | A sandboxed dev container |
-| [`.github/`](./.github) | Issue templates, the agent's CI and release workflows, and the workflows that triage issues |
-
-## Using the plugins with the Claude Code engine
-
-The plugins in [`plugins/`](./plugins) run in the Claude Code CLI from Anthropic. To use them there, run:
-
-```
-/plugin marketplace add fotohubapp/Fh-code
-/plugin install feature-dev@fotohub-code-plugins
-```
-
-The `fhcode` agent reads custom commands from `.claude/commands/`, so plain command files work in both tools.
+| [`.github/`](./.github) | Issue templates, FH Code CI and release workflows, and issue automation |
 
 ## Reporting bugs
 
@@ -49,8 +42,8 @@ File a [GitHub issue](https://github.com/fotohubapp/Fh-code/issues). For securit
 
 ## Data
 
-FOTOhub Code sends your prompts, the files it reads, and tool output to the FOTOhub API (`apis.fotohub.app`) to generate responses. Usage is billed to your FOTOhub wallet.
+FH Code sends your prompts, the files it reads and tool output to the FOTOhub API (`apis.fotohub.app`), plus to any MCP servers you add. Usage is billed to your FOTOhub wallet. Transcripts are stored locally in `~/.fhcode/sessions/`, with API keys redacted.
 
 ## License
 
-See [LICENSE.md](./LICENSE.md) and [NOTICE.md](./NOTICE.md). The `agent/` directory is FOTOhub's own code under the MIT license ([agent/LICENSE](./agent/LICENSE)). Claude and Claude Code are trademarks of Anthropic PBC; FOTOhub Code is not affiliated with or endorsed by Anthropic.
+See [LICENSE.md](./LICENSE.md) and [NOTICE.md](./NOTICE.md). `fhcode/` is FOTOhub's own code under the MIT license ([fhcode/LICENSE](./fhcode/LICENSE)). Claude and Claude Code are trademarks of Anthropic PBC. FH Code is not affiliated with or endorsed by Anthropic.

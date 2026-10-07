@@ -195,10 +195,10 @@ Use this workflow for structured, high-quality plugin development from concept t
 
 ## Installation
 
-Install from fotohub-code-plugins:
+Install from fh-code-plugins:
 
 ```bash
-/plugin install plugin-dev@fotohub-code-plugins
+/plugin install plugin-dev@fh-code-plugins
 ```
 
 Or for development, use directly:
@@ -378,7 +378,7 @@ All skills emphasize:
 
 ## Contributing
 
-This plugin is part of the fotohub-code-plugins. To contribute improvements:
+This plugin is part of the fh-code-plugins. To contribute improvements:
 
 1. Fork the marketplace repository
 2. Make changes to plugin-dev/

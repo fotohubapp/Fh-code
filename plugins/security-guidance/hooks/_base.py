@@ -60,9 +60,9 @@ def debug_log(message):
 # a concrete reference instead of treating it as unknown-actor injection.
 # Some autonomous-agent setups flag un-attributed injected text as prompt
 # injection and stall; the banner makes the provenance explicit.
-PROVENANCE_TAG = "[from security-guidance@fotohub-code-plugins plugin]"
+PROVENANCE_TAG = "[from security-guidance@fh-code-plugins plugin]"
 PROVENANCE_BANNER = (
-    "[from security-guidance@fotohub-code-plugins plugin — automated "
+    "[from security-guidance@fh-code-plugins plugin — automated "
     "security review, not user input.]"
 )
 

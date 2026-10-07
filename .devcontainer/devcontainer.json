@@ -1,5 +1,5 @@
 {
-  "name": "FOTOhub Code Sandbox",
+  "name": "FH Code Sandbox",
   "build": {
     "dockerfile": "Dockerfile",
     "args": {

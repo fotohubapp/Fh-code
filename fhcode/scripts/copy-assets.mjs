@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 cpSync(`${root}src/docs/index.generated.json`, `${root}dist/docs/index.generated.json`);
 
-const BUNDLED = ["fotohub", "fh-code-ui"];
+// fotohub and fh-code-ui are FH Code's own; the rest are the repository's
+// coding plugins, which need nothing but the engine.
+const BUNDLED = ["fotohub", "fh-code-ui", "feature-dev", "code-review", "commit-commands", "pr-review-toolkit"];
 rmSync(`${root}dist/plugins`, { recursive: true, force: true });
 for (const name of BUNDLED) {
   const src = `${root}../plugins/${name}`;

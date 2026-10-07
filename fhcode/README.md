@@ -10,8 +10,15 @@ Every model turn goes to `apis.fotohub.app` and is billed to the prepaid wallet 
 
 FH Code adds these on top:
 
+- **Your FOTOhub account in the engine.** `/login` and `/logout` sign in and out of FOTOhub in the browser (the FOTOhub CLI's flow), and the session switches accounts without a restart. The first `fhcode` run signs you in too.
+- **Design mode.** `/fotohub:design` builds a striking site with original imagery from FOTOhub's 40+ image models: brief, creative directions, design system, a costed image plan, generation, optimisation, then screenshots and critique. `/output-style FOTOhub Design` keeps a whole session in that mode. `/fotohub:brand` makes a brand kit, and `/fotohub:assets` makes favicon, app icon, OG and hero images.
+- **Code intelligence and dependencies.**
+  - **Language servers.** They give the engine diagnostics after every edit, go-to-definition, references and hover, for TypeScript/JavaScript, Python, Go, Rust and PHP. Each launch declares only the servers that are installed.
+  - **`fhcode doctor`** checks everything FH Code relies on.
+  - **`fhcode setup`** installs what is missing: the engine, the project's language servers, and the design tools with `--design`.
+  - **Coding plugins ship built in:** feature-dev, code-review, commit-commands and pr-review-toolkit.
 - **The FOTOhub look.**
-  - **The FOTOhub API hero.** A start-up panel above the prompt with a violet-to-rose gradient wordmark, the live wallet, and quick actions. It steps aside when you start working; `/fh` shows it again.
+  - **The FOTOhub API header.** It is always on screen above the prompt, with a violet-to-rose gradient wordmark, your account and the live wallet. It opens as a full panel with quick actions and stays as a compact header while you work; `/fh` toggles the full panel.
   - **The FOTOhub theme.** A violet theme, with the mascot recoloured to match.
   - **A status line:** `FH Code · Sonnet 4.6 · wallet $42.50 · session $0.12`.
   - **FOTOhub start-up notes, tips and spinner words.**
@@ -58,14 +65,18 @@ Inside a session, everything works as in Claude Code. A few things are FOTOhub-s
   - Claude Sonnet 4.5
   - Claude Sonnet 4
   - Claude Haiku 4.5
-- **`/plugin install feature-dev@fh-code-plugins`** installs plugins from this repository's marketplace.
+- **`/login` and `/logout`** are your FOTOhub account's.
+- **`/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, `/fotohub:generate` and `/fotohub:integrate`** come with the bundled `fotohub` plugin, and so does the "FOTOhub Design" output style.
+- **`/plugin install <name>@fh-code-plugins`** installs more plugins from this repository's marketplace.
 - **The status line** shows the wallet balance and what this session has cost on FOTOhub.
 
 ### Commands of FH Code itself
 
 | Command | What it does |
 |---------|--------------|
-| `fhcode login [key]` / `logout` | Save or remove your FOTOhub API key |
+| `fhcode login` / `logout` | Sign in to or out of your FOTOhub account in the browser (`--manual` or a key to paste one) |
+| `fhcode doctor` | Check the engine, git/gh/jq/python3, language servers, design tools, key, wallet, MCP and docs |
+| `fhcode setup [--design] [--all] [-y]` | Install what is missing: the engine, the project's language servers, and Playwright for design QA |
 | `fhcode wallet` / `packages` | Wallet balance, monthly limit, tier; top-up packages |
 | `fhcode usage [--days 30]` | What FH Code spent: by day, model, project, and interactive vs background |
 | `fhcode docs <query>` | Search docs.fotohub.app |
@@ -214,6 +225,6 @@ const gw = await startGateway({ apiKey });
 
 ```bash
 npm ci
-npm test    # 29 tests against a mock FOTOhub API, including an end-to-end run of the real engine when `claude` is installed
+npm test    # 34 tests against a mock FOTOhub API, including an end-to-end run of the real engine when `claude` is installed
 node scripts/build-docs-index.mjs <fotohubapp/docs checkout>
 ```

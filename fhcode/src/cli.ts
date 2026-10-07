@@ -27,6 +27,10 @@ import { packagesTool, walletTool } from "./tools/account.js";
 import type { ToolContext } from "./tools/types.js";
 import { backgroundUpdateCheck, fetchLatest, installUpdate, isNewer } from "./update.js";
 import { readUsage, summarizeUsage, type UsageRow } from "./usage.js";
+import { localChecks, runStep, setupPlan, type Check } from "./deps.js";
+import { findEngine } from "./engine/launch.js";
+import { HttpTransport, McpClient } from "./mcp/client.js";
+import { browserLogin, logout, saveKey } from "./auth.js";
 import { VERSION } from "./version.js";
 
 const useColor = stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== "dumb";
@@ -59,13 +63,18 @@ export interface ParsedArgs {
   resume?: string | true;
   follow: boolean;
   project: boolean;
+  yes: boolean;
+  manual: boolean;
+  noBrowser: boolean;
+  all: boolean;
+  design: boolean;
   noMcp: boolean;
   help: boolean;
   version: boolean;
   check: boolean;
 }
 
-const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions", "usage"]);
+const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions", "usage", "doctor", "setup"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const out: ParsedArgs = {
@@ -80,6 +89,11 @@ export function parseArgs(argv: string[]): ParsedArgs {
     continue: false,
     follow: false,
     project: false,
+    yes: false,
+    manual: false,
+    noBrowser: false,
+    all: false,
+    design: false,
     noMcp: false,
     help: false,
     version: false,
@@ -179,6 +193,22 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case "--project":
         out.project = true;
         break;
+      case "-y":
+      case "--yes":
+        out.yes = true;
+        break;
+      case "--all":
+        out.all = true;
+        break;
+      case "--design":
+        out.design = true;
+        break;
+      case "--manual":
+        out.manual = true;
+        break;
+      case "--no-browser":
+        out.noBrowser = true;
+        break;
       case "--no-mcp":
         out.noMcp = true;
         break;
@@ -226,8 +256,9 @@ Integrations of the lite agent
   fhcode lite plugin marketplace add <owner/repo|url|dir> | list | update
 
 Account
-  fhcode login [fh_live_...]      save your FOTOhub API key (fotohub.app/settings/api)
-  fhcode logout                   remove the saved key
+  fhcode login                    sign in to your FOTOhub account in the browser
+  fhcode login --manual | <key>   paste an API key instead (fotohub.app/settings/api)
+  fhcode logout                   sign out (remove the saved key)
   fhcode wallet                   wallet balance, monthly limit, tier
   fhcode packages                 wallet top-up packages
 
@@ -271,10 +302,11 @@ export async function liteMain(argv: string[]): Promise<number> {
   try {
     switch (args.command) {
       case "login":
-        return await login(args.rest[0], config);
+        return await login(args.rest[0], config, { manual: args.manual, browser: !args.noBrowser });
       case "logout":
-        updateConfigFile({ apiKey: undefined });
-        stdout.write("Removed the saved FOTOhub API key.\n");
+        logout();
+        stdout.write("Signed out of FOTOhub: the saved API key is removed.\n");
+        if (process.env.FOTOHUB_API_KEY) stdout.write(yellow("FOTOHUB_API_KEY is still set in your environment and keeps being used.\n"));
         return 0;
       case "docs":
         return docs(args.rest.join(" "));
@@ -296,6 +328,10 @@ export async function liteMain(argv: string[]): Promise<number> {
         return sessionsCommand(args);
       case "usage":
         return usageCommand(args);
+      case "doctor":
+        return await doctorCommand(args, config);
+      case "setup":
+        return await setupCommand(args);
     }
   } catch (err) {
     stderr.write(`${red(describeError(err))}\n`);
@@ -673,6 +709,96 @@ function printSessions(cwd?: string): void {
   stdout.write(dim("Resume with: fhcode lite --resume <id>\n"));
 }
 
+async function doctorCommand(args: ParsedArgs, config: FhcodeConfig): Promise<number> {
+  const checks: Check[] = localChecks(args.cwd, findEngine());
+  if (!config.apiKey) {
+    checks.push({ name: "FOTOhub API key", status: "fail", detail: "not set", fix: "fhcode login   (keys: https://fotohub.app/settings/api)" });
+  } else {
+    const client = new FotohubClient({ apiKey: config.apiKey, baseUrl: config.baseUrl, userAgent: `fh-code/${VERSION}`, maxRateLimitRetries: 0 });
+    try {
+      const [balance, tier] = await Promise.all([client.getBalance(), client.getCurrentTier().catch(() => undefined)]);
+      checks.push({ name: "FOTOhub API key", status: "ok", detail: `${maskKey(config.apiKey)} · ${config.baseUrl}` });
+      const low = balance.wallet.balance_usd < 1;
+      checks.push({
+        name: "FOTOhub wallet",
+        status: low ? "warn" : "ok",
+        detail: `$${fmt(balance.wallet.balance_usd)}${tier ? ` · ${tier.tier}, ${tier.limits?.rpm} requests/min` : ""}`,
+        fix: low ? `top up: ${TOPUP_URL}` : undefined,
+      });
+    } catch (err) {
+      checks.push({ name: "FOTOhub API key", status: "fail", detail: describeError(err), fix: "fhcode login" });
+    }
+    try {
+      const mcp = new McpClient(new HttpTransport(`${config.baseUrl!.replace(/\/+$/, "")}/mcp/`, { Authorization: `Bearer ${config.apiKey}` }));
+      await mcp.initialize(AbortSignal.timeout(10_000));
+      const tools = await mcp.listTools(AbortSignal.timeout(10_000));
+      checks.push({ name: "FOTOhub MCP server", status: "ok", detail: `${tools.length} tools` });
+      await mcp.close();
+    } catch (err) {
+      checks.push({ name: "FOTOhub MCP server", status: "warn", detail: `unreachable: ${(err as Error).message}`, fix: "FOTOhub tools will be missing from /mcp" });
+    }
+  }
+  try {
+    const res = await fetch(`${config.docsSource}/api/billing.md`, { signal: AbortSignal.timeout(10_000) });
+    checks.push(res.ok ? { name: "docs.fotohub.app source", status: "ok", detail: config.docsSource! } : { name: "docs.fotohub.app source", status: "warn", detail: `HTTP ${res.status} from ${config.docsSource}` });
+  } catch (err) {
+    checks.push({ name: "docs.fotohub.app source", status: "warn", detail: `unreachable: ${(err as Error).message}`, fix: "set FHCODE_DOCS_SOURCE, or allow raw.githubusercontent.com" });
+  }
+  try {
+    const latest = await fetchLatest(config.updateUrl!);
+    checks.push(
+      latest && isNewer(latest.version, VERSION)
+        ? { name: "FH Code", status: "warn", detail: `${VERSION}; ${latest.version} is available`, fix: "fhcode update" }
+        : { name: "FH Code", status: "ok", detail: `${VERSION}, up to date` },
+    );
+  } catch {
+    checks.push({ name: "FH Code", status: "ok", detail: `${VERSION} (update channel unreachable)` });
+  }
+
+  const mark = { ok: green("✓"), warn: yellow("!"), fail: red("✗") };
+  for (const c of checks) {
+    stdout.write(`${mark[c.status]} ${c.name.padEnd(40)} ${c.status === "ok" ? dim(c.detail) : c.detail}\n`);
+    if (c.fix && c.status !== "ok") stdout.write(`  ${dim("→")} ${c.fix}\n`);
+  }
+  const failed = checks.filter((c) => c.status === "fail").length;
+  const warned = checks.filter((c) => c.status === "warn").length;
+  stdout.write(`\n${failed ? red(`${failed} problem(s)`) : green("Ready")}${warned ? yellow(`, ${warned} suggestion(s)`) : ""}. ${failed || warned ? "fhcode setup installs what it can." : ""}\n`);
+  return failed ? 1 : 0;
+}
+
+async function setupCommand(args: ParsedArgs): Promise<number> {
+  const steps = setupPlan(args.cwd, findEngine(), args.all, args.design);
+  if (!steps.length) {
+    stdout.write(green("Everything FH Code uses here is installed.") + dim(" (--all also offers language servers this project does not use)\n"));
+    return 0;
+  }
+  stdout.write(`${bold("FH Code setup")} will install:\n`);
+  for (const s of steps) stdout.write(`  ${s.skip ? yellow("skip") : "•"} ${s.what}${s.skip ? dim(` (${s.skip})`) : dim(`: ${s.tool} ${s.args.join(" ")}`)}\n`);
+  const runnable = steps.filter((s) => !s.skip);
+  if (!runnable.length) return 1;
+  if (!args.yes) {
+    if (!stdin.isTTY) {
+      stderr.write("Run with --yes to install without asking.\n");
+      return 1;
+    }
+    const rl = createInterface({ input: stdin, output: stdout });
+    const answer = (await rl.question("Install now? [Y/n] ")).trim().toLowerCase();
+    rl.close();
+    if (answer && !["y", "yes", "t", "tak"].includes(answer)) return 1;
+  }
+  let failed = 0;
+  for (const s of runnable) {
+    stdout.write(`\n${purple("›")} ${s.what}\n`);
+    const code = await runStep(s);
+    if (code !== 0) {
+      failed++;
+      stdout.write(red(`  failed (exit ${code})\n`));
+    }
+  }
+  stdout.write(failed ? red(`\n${failed} step(s) failed; see the output above.\n`) : green("\nDone. Run fhcode doctor to check.\n"));
+  return failed ? 1 : 0;
+}
+
 function usageCommand(args: ParsedArgs): number {
   const days = args.days ?? 30;
   const s = summarizeUsage(readUsage(days));
@@ -878,25 +1004,34 @@ async function hubCommand(args: ParsedArgs, config: FhcodeConfig): Promise<numbe
   return 0;
 }
 
-async function login(key: string | undefined, config: FhcodeConfig): Promise<number> {
+export async function login(key: string | undefined, config: FhcodeConfig, opts: { manual?: boolean; browser?: boolean } = {}): Promise<number> {
   let apiKey = key;
-  if (!apiKey) {
+  if (!apiKey && opts.manual) {
     const rl = createInterface({ input: stdin, output: stdout });
     stdout.write("Create a key at https://fotohub.app/settings/api\n");
     apiKey = (await rl.question("FOTOhub API key (fh_live_...): ")).trim();
     rl.close();
   }
-  if (!apiKey.startsWith("fh_")) {
-    stderr.write(red("That does not look like a FOTOhub API key (fh_live_...).\n"));
-    return 1;
-  }
   try {
-    const balance = await new FotohubClient({ apiKey, baseUrl: config.baseUrl }).getBalance();
-    updateConfigFile({ apiKey });
-    stdout.write(green(`Logged in with ${maskKey(apiKey)}. Wallet $${fmt(balance.wallet.balance_usd)}.\n`));
+    if (!apiKey) {
+      // Default: sign in with the FOTOhub account in the browser.
+      const result = await browserLogin({
+        baseUrl: config.baseUrl,
+        open: opts.browser !== false,
+        onUrl: (url) => stdout.write(`${bold("Sign in to your FOTOhub account")} in the browser.\nIf it does not open, visit:\n  ${url}\n${dim("Waiting for fotohub.app...")}\n`),
+      });
+      stdout.write(green(`Signed in to FOTOhub${result.email ? ` as ${result.email}` : ""}${result.plan ? ` (${result.plan})` : ""}. Wallet $${fmt(result.balanceUsd ?? 0)}.\n`));
+      return 0;
+    }
+    if (!apiKey.startsWith("fh_")) {
+      stderr.write(red("That does not look like a FOTOhub API key (fh_live_...).\n"));
+      return 1;
+    }
+    const result = await saveKey(apiKey, config.baseUrl);
+    stdout.write(green(`Logged in with ${maskKey(apiKey)}. Wallet $${fmt(result.balanceUsd ?? 0)}.\n`));
     return 0;
   } catch (err) {
-    stderr.write(red(`The key was not saved: ${describeError(err)}\n`));
+    stderr.write(red(`Not signed in: ${describeError(err)}\n`) + dim("Try: fhcode login --manual (paste an API key)\n"));
     return 1;
   }
 }

@@ -10,7 +10,9 @@
 
 import { stderr, stdout } from "node:process";
 import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import { liteMain } from "./cli.js";
+import { engineInstallCommand, runStep } from "./deps.js";
 import { resolveConfig } from "./config.js";
 import { ENGINE_INSTALL_HELP, findEngine, launchEngine, statusLine } from "./engine/launch.js";
 import { startGateway } from "./gateway/server.js";
@@ -19,7 +21,7 @@ import { recordUsage } from "./usage.js";
 import { VERSION } from "./version.js";
 
 /** Subcommands FH Code handles itself; everything else goes to the engine. */
-const OWN = new Set(["login", "logout", "wallet", "packages", "docs", "agents", "hub", "sessions", "update", "usage"]);
+const OWN = new Set(["login", "logout", "wallet", "packages", "docs", "agents", "hub", "sessions", "update", "usage", "doctor", "setup"]);
 
 const HELP = `FH Code ${VERSION} — FOTOhub Code
 
@@ -28,12 +30,15 @@ const HELP = `FH Code ${VERSION} — FOTOhub Code
   fhcode -p "prompt"           headless; -c continue; -r resume; --model; --permission-mode ...
   fhcode mcp | plugin ...      the engine's MCP and plugin commands (marketplace fh-code-plugins)
 
-  fhcode login [fh_live_...]   save your FOTOhub API key (fotohub.app/settings/api)
+  fhcode login                 sign in to your FOTOhub account (browser); --manual to paste a key
+  fhcode logout                sign out of FOTOhub
   fhcode wallet | packages     FOTOhub wallet, limits and top-up packages
   fhcode usage [--days 30]     what FH Code spent: by day, model, project
   fhcode docs <query>          search docs.fotohub.app
   fhcode agents run "prompt"   background agent;  fhcode agents [logs|send|stop] <id>
   fhcode hub                   agent hub dashboard in the browser
+  fhcode doctor                check the engine, tools, language servers, key, wallet and MCP
+  fhcode setup [--design] [--all] [-y]   install what is missing: the engine, language servers, design tools
   fhcode update                install the latest FH Code release
   fhcode gateway               run only the FOTOhub gateway (for IDE extensions)
   fhcode lite [...]            FH Code's built-in agent, no engine needed
@@ -57,15 +62,31 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
 
-  const config = resolveConfig();
+  let config = resolveConfig();
+  if (!config.apiKey && process.stdin.isTTY && process.stdout.isTTY && first !== "gateway") {
+    // First run: sign in to the FOTOhub account, as the engine would ask for its own.
+    stdout.write("Welcome to FH Code. Sign in to your FOTOhub account to start.\n");
+    if ((await liteMain(["login"])) === 0) config = resolveConfig();
+  }
   if (!config.apiKey) {
-    stderr.write("No FOTOhub API key. Run `fhcode login` or set FOTOHUB_API_KEY. Keys: https://fotohub.app/settings/api\n");
+    stderr.write("Not signed in to FOTOhub. Run `fhcode login` (or set FOTOHUB_API_KEY). Keys: https://fotohub.app/settings/api\n");
     return 1;
   }
 
   if (first === "gateway") return gatewayOnly(config);
 
-  const engine = findEngine();
+  let engine = findEngine();
+  if (!engine && process.stdin.isTTY && process.stdout.isTTY) {
+    // First run without the engine: offer to install it right here.
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = (await rl.question(`FH Code runs on the Claude Code engine, which is not installed.\nInstall it now (${engineInstallCommand().display})? [Y/n] `)).trim().toLowerCase();
+    rl.close();
+    if (!answer || ["y", "yes", "t", "tak"].includes(answer)) {
+      const c = engineInstallCommand();
+      await runStep({ what: "Claude Code engine", tool: c.tool, args: c.args });
+      engine = findEngine();
+    }
+  }
   if (!engine) {
     stderr.write(`${ENGINE_INSTALL_HELP}\n`);
     return 1;

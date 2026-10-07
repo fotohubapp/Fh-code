@@ -22,11 +22,12 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "n
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { HttpAccountProvider, fmt } from "../account/guard.js";
-import { CONFIG_DIR, type FhcodeConfig } from "../config.js";
+import { CONFIG_DIR, resolveConfig, type FhcodeConfig } from "../config.js";
 import { fotohubMcpConfig } from "../mcp/manager.js";
 import { startGateway } from "../gateway/server.js";
 import { ENGINE_MODELS } from "../gateway/translate.js";
-import { FOTOHUB_PLUGIN_DIR, UI_PLUGIN_DIR } from "../bundled.js";
+import { bundledPluginDirs } from "../bundled.js";
+import { writeLspPlugin } from "../deps.js";
 import { recordUsage } from "../usage.js";
 
 export const ENGINE_HOME = path.join(CONFIG_DIR, "engine");
@@ -173,6 +174,9 @@ function engineEnv(gatewayUrl: string, token: string, config: FhcodeConfig): Nod
     CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1",
     FHCODE_GATEWAY_URL: gatewayUrl,
     FHCODE_GATEWAY_TOKEN: token,
+    // For the fh-code-ui mod: /login and /logout run FH Code itself.
+    FHCODE_NODE: process.execPath,
+    FHCODE_BIN: BIN,
   });
   return env;
 }
@@ -187,6 +191,7 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
   const { mcpConfigFile } = prepareEngineHome(config);
   const gateway = await startGateway({
     apiKey: config.apiKey!,
+    getApiKey: () => resolveConfig().apiKey,
     baseUrl: config.baseUrl,
     defaultModel: config.model,
     maxBudgetUsd: config.maxBudgetUsd,
@@ -196,6 +201,9 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
   options.onGateway?.(gateway.url);
 
   const isSession = !(args[0] && ENGINE_SUBCOMMANDS.has(args[0]));
+  // Bundled plugins, plus the language servers installed on this machine.
+  const lspDir = isSession ? writeLspPlugin() : undefined;
+  const pluginDirs = [...bundledPluginDirs(), ...(lspDir ? [lspDir] : [])];
   // --mcp-config takes several values, so single-value options follow it
   // before the user's own arguments (which may start with the prompt). The
   // bundled fotohub plugin comes with every FH Code release.
@@ -203,10 +211,7 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
     ? [
         "--mcp-config",
         mcpConfigFile,
-        "--plugin-dir",
-        FOTOHUB_PLUGIN_DIR.replace(/[\\/]$/, ""),
-        "--plugin-dir",
-        UI_PLUGIN_DIR.replace(/[\\/]$/, ""),
+        ...pluginDirs.flatMap((dir) => ["--plugin-dir", dir]),
         "--append-system-prompt",
         FOTOHUB_SYSTEM_PROMPT,
         ...args,

@@ -27,6 +27,16 @@ export async function startMockApi({ turns = [], respond, balance = 10, monthlyL
       res.end(JSON.stringify(data));
     };
 
+    // fotohub.app's browser sign-in: signs the person in at once and sends the key back.
+    if (req.url.startsWith("/cli-auth")) {
+      const u = new URL(req.url, "http://x");
+      const back = new URL(u.searchParams.get("redirect_uri"));
+      back.searchParams.set("key", KEY);
+      back.searchParams.set("state", u.searchParams.get("state"));
+      back.searchParams.set("email", "dev@fotohub.app");
+      res.writeHead(302, { location: back.href });
+      return res.end();
+    }
     if (req.headers.authorization !== `Bearer ${KEY}`) return sendJson(401, { detail: "Invalid API key" });
 
     if (req.url === "/mcp/") {

@@ -7,7 +7,10 @@ FH Code is Claude Code running on the FOTOhub API. You get the same terminal int
 On top of Claude Code, FH Code adds:
 
 - the FOTOhub look: the FOTOhub API hero above the prompt, a violet theme, a status line with the wallet, start-up notes and tips,
+- `/login` and `/logout` for your FOTOhub account (browser sign-in),
+- design mode (`/fotohub:design`): stunning sites with original imagery from FOTOhub's 40+ image models, plus brand kits and web asset sets,
 - the built-in `fotohub` plugin: skills, `/fotohub:*` commands and agents for building on the FOTOhub API,
+- code intelligence: language servers for TS/JS, Python, Go, Rust and PHP, with `fhcode doctor` and `fhcode setup` for every dependency,
 - FOTOhub's MCP tools for image, video, audio, 3D, storage, pricing and the wallet,
 - a docs.fotohub.app search,
 - an agent hub for background agents, with follow-ups and a cost ledger (`fhcode usage`),
@@ -22,7 +25,8 @@ cd your-project && fhcode
 
 | Area | In FH Code |
 |------|------------|
-| Coding | The full Claude Code terminal experience, on FOTOhub models (Sonnet 4.6, 4.5, 4, Haiku 4.5) |
+| Coding | The full Claude Code terminal experience, on FOTOhub models (Sonnet 4.6, 4.5, 4, Haiku 4.5), with diagnostics from language servers after every edit |
+| Design | `/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, and the "FOTOhub Design" output style |
 | Agents | Claude Code subagents, plus the FH Code hub: `fhcode agents run`, `fhcode hub` dashboard |
 | FOTOhub | Built-in `fotohub` MCP server; `fh-code` MCP server with docs.fotohub.app, wallet, packages and hub |
 | Integrations | Any MCP server, and plugins from the `fh-code-plugins` marketplace (this repository) |

@@ -1,11 +1,18 @@
 {
   "name": "fotohub",
-  "version": "1.0.0",
-  "description": "FOTOhub for FH Code: integrate the FOTOhub API and SDKs correctly, generate images, video, audio and 3D with FOTOhub's MCP tools, and connect stores through FOTOhub's commerce integrations.",
+  "version": "1.1.0",
+  "description": "FOTOhub for FH Code: FOTOhub API integration, design mode for stunning websites with FOTOhub-generated imagery (40+ image models), brand kits and asset sets, media generation with FOTOhub's MCP tools, and commerce integrations.",
   "author": {
     "name": "FOTOhub",
     "email": "dev@fotohub.app"
   },
   "homepage": "https://github.com/fotohubapp/Fh-code/tree/main/plugins/fotohub",
-  "keywords": ["fotohub", "ai", "image-generation", "video", "ecommerce", "mcp"]
+  "keywords": [
+    "fotohub",
+    "ai",
+    "image-generation",
+    "video",
+    "ecommerce",
+    "mcp"
+  ]
 }

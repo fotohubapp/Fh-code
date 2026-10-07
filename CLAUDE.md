@@ -10,9 +10,14 @@ dependencies. `fhcode` runs the Claude Code engine through FH Code's gateway
 agent endpoint; `src/engine/launch.ts` sets up the engine's home, theme, status
 line and MCP servers. `fhcode lite` is FH Code's own agent (`src/agent/`).
 Two plugins ship inside FH Code and load in every engine session:
-`plugins/fotohub` (skills, commands and agents for the FOTOhub API) and
-`plugins/fh-code-ui` (a mod drawing the FOTOhub API hero above the prompt; test
-it with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test plugins/fh-code-ui`). Run `npm ci && npm test` in `fhcode/` after changing
+`plugins/fotohub` (skills, commands, agents and the "FOTOhub Design" output
+style for the FOTOhub API and design mode) and
+`plugins/fh-code-ui` (a mod drawing the FOTOhub API header above the prompt and
+answering /login and /logout for the FOTOhub account; test
+it with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test plugins/fh-code-ui`).
+The repository's feature-dev, code-review, commit-commands and pr-review-toolkit
+plugins ship inside FH Code too (`fhcode/scripts/copy-assets.mjs`). `src/deps.ts`
+owns dependencies: `fhcode doctor`, `fhcode setup` and the generated fh-code-lsp plugin. Run `npm ci && npm test` in `fhcode/` after changing
 it; the tests run against a mock FOTOhub API and also load every plugin in
 `plugins/`, so a plugin change can break them. FOTOhub API details (endpoints,
 fields, prices) come from docs.fotohub.app, whose source is the fotohubapp/docs

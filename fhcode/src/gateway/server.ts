@@ -23,6 +23,11 @@ import { anthropicError, anthropicStopReason, AnthropicStreamWriter, ENGINE_MODE
 
 export interface GatewayOptions {
   apiKey: string;
+  /**
+   * Re-read before each request when given, so signing in or out of FOTOhub
+   * (/login, /logout) takes effect in a running session.
+   */
+  getApiKey?: () => string | undefined;
   baseUrl?: string;
   /** FOTOhub model used when the engine asks for one FOTOhub does not serve. */
   defaultModel?: string;
@@ -45,9 +50,26 @@ export interface Gateway {
 export async function startGateway(options: GatewayOptions): Promise<Gateway> {
   const token = `fhgw-${randomBytes(24).toString("base64url")}`;
   // No retries here: the engine retries rate limits itself, with its own backoff.
-  const client = new FotohubClient({ apiKey: options.apiKey, baseUrl: options.baseUrl, fetch: options.fetch, userAgent: `fh-code/${VERSION}`, maxRateLimitRetries: 0 });
-  const guard = new AccountGuard({
-    provider: options.accountProvider ?? new FotohubApiAccountProvider(client),
+  const makeClient = (apiKey: string) =>
+    new FotohubClient({ apiKey, baseUrl: options.baseUrl, fetch: options.fetch, userAgent: `fh-code/${VERSION}`, maxRateLimitRetries: 0 });
+  let currentKey: string | undefined = options.apiKey;
+  let client = makeClient(options.apiKey);
+  let checkedAt = 0;
+  /** The client for the account signed in now, or undefined after a sign-out. */
+  const activeClient = (): FotohubClient | undefined => {
+    if (options.getApiKey && Date.now() - checkedAt > 2000) {
+      checkedAt = Date.now();
+      const key = options.getApiKey();
+      if (key !== currentKey) {
+        currentKey = key;
+        if (key) client = makeClient(key);
+        guard.invalidate();
+      }
+    }
+    return currentKey ? client : undefined;
+  };
+  const guard: AccountGuard = new AccountGuard({
+    provider: options.accountProvider ?? { getLimits: (signal) => new FotohubApiAccountProvider(activeClient() ?? client).getLimits(signal) },
     sessionBudgetUsd: options.maxBudgetUsd,
   });
   const stats = { turns: 0, inputTokens: 0, outputTokens: 0 };
@@ -68,8 +90,10 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
 
     try {
       if (req.method === "GET" && url.pathname === "/fh/status") {
+        if (!activeClient()) return json(200, { signedIn: false, balanceUsd: null, sessionUsd: guard.sessionSpentUsd, turns: stats.turns, display: "FH Code · not signed in to FOTOhub (/login)" });
         const balance = await guard.estimatedBalance().catch(() => null);
         return json(200, {
+          signedIn: true,
           balanceUsd: balance,
           sessionUsd: guard.sessionSpentUsd,
           turns: stats.turns,
@@ -106,6 +130,13 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       if (!res.writableEnded) controller.abort();
     });
 
+    const fh = activeClient();
+    if (!fh) {
+      const e = anthropicError(401, "Not signed in to FOTOhub. Run /login to sign in to your FOTOhub account.");
+      res.writeHead(e.status, { "content-type": "application/json" });
+      res.end(JSON.stringify(e.body));
+      return;
+    }
     try {
       await guard.preflight(controller.signal);
     } catch (err) {
@@ -143,7 +174,7 @@ export async function startGateway(options: GatewayOptions): Promise<Gateway> {
       let usage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
       // The first frame decides whether the request worked, so HTTP errors from
       // FOTOhub are still reported as HTTP errors to the engine.
-      for await (const frame of client.agentStream(fhReq, controller.signal)) {
+      for await (const frame of fh.agentStream(fhReq, controller.signal)) {
         begin();
         if (frame.type === "text_delta") writer!.text(frame.text);
         else if (frame.type === "tool_use") writer!.toolUse(frame.id, frame.name, frame.input ?? {});

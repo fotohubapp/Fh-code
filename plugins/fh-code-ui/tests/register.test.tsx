@@ -4,36 +4,37 @@ tier('user')
 
 const PROPS = { hasSurvey: false, isWorking: false, maxRows: 20, bodyColumns: 120, scroll: { offset: 0, bodyRows: 20 }, view: {} }
 const BAND = { plugin: 'fh-code-ui', surface: 'terminal', component: 'AbovePrompt', props: PROPS } as const
+const RUN = { args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as const
 
 describe('register', () => {
-  test('the FOTOhub API hero shows above the prompt with its actions', async $ => {
+  test('the full FOTOhub API panel shows at the start, with its actions', async $ => {
     const ui = await $.ui.mount(BAND)
     expect(await ui.find({ text: 'FH Code' })).toBeDefined()
-    expect(await ui.find({ text: '/fotohub:generate' })).toBeDefined()
-    expect(await ui.find({ type: 'Button', key: 'hide' })).toBeDefined()
+    expect(await ui.find({ text: '/fotohub:design' })).toBeDefined()
+    expect(await ui.find({ type: 'Button', key: 'compact' })).toBeDefined()
   })
 
-  test('Hide removes it and /fh brings it back', async ($, on) => {
-    // Beneath the plugins the engine draws nothing in the band of its own.
-    on('ui.render', ($, e) => {
-      const { Box } = $.ui.resolve(e)
-      return <Box />
-    })
+  test('Compact keeps the header on screen; /fh brings the full panel back', async ($, on) => {
     on('env.get', () => ({ value: undefined }))
     const ui = await $.ui.mount(BAND)
-    await ui.press({ key: 'hide' })
-    expect(await ui.find({ text: 'FH Code' })).toBeUndefined()
-    const { text } = await $.command.run({ command: 'fh', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } })
-    expect(text).toContain('FOTOhub API')
+    await ui.press({ key: 'compact' })
     expect(await ui.find({ text: 'FH Code' })).toBeDefined()
+    expect(await ui.find({ text: '/fotohub:design' })).toBeUndefined()
+    const { text } = await $.command.run({ command: 'fh', ...RUN })
+    expect(text).toContain('FOTOhub API')
+    expect(await ui.find({ text: '/fotohub:design' })).toBeDefined()
   })
 
-  test('it steps aside while a turn runs', async ($, on) => {
-    on('ui.render', ($, e) => {
-      const { Box } = $.ui.resolve(e)
-      return <Box />
-    })
+  test('the header stays while a turn runs, compact', async $ => {
     const ui = await $.ui.mount({ ...BAND, props: { ...PROPS, isWorking: true } })
-    expect(await ui.find({ text: 'FH Code' })).toBeUndefined()
+    expect(await ui.find({ text: 'FH Code' })).toBeDefined()
+    expect(await ui.find({ text: '/fotohub:design' })).toBeUndefined()
+  })
+
+  test('outside FH Code, /login is left to the engine', async ($, on) => {
+    on('env.get', () => ({ value: undefined }))
+    on('command.run', () => ({ text: 'engine login' }))
+    const { text } = await $.command.run({ command: 'login', ...RUN })
+    expect(text).toBe('engine login')
   })
 })

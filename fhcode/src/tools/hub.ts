@@ -1,5 +1,5 @@
 import { fmt } from "../account/guard.js";
-import { getHubAgent, listHubAgents, startHubAgent, stopHubAgent } from "../hub/store.js";
+import { continueHubAgent, getHubAgent, listHubAgents, startHubAgent, stopHubAgent } from "../hub/store.js";
 import { isPermissionMode } from "../agent/permissions.js";
 import { resolveInWorkspace } from "./files.js";
 import { num, str, ToolInputError, truncate, type Tool } from "./types.js";
@@ -95,4 +95,19 @@ export const hubStopTool: Tool = {
   },
 };
 
-export const hubTools: Tool[] = [hubStartTool, hubListTool, hubOutputTool, hubStopTool];
+export const hubSendTool: Tool = {
+  kind: "exec",
+  definition: {
+    name: "hub_send_agent",
+    description:
+      "Send a finished hub agent a follow-up message. It continues in the same session, with everything it did before, as a new hub run (billed to the wallet).",
+    input_schema: { type: "object", properties: { id: { type: "string" }, prompt: { type: "string" } }, required: ["id", "prompt"] },
+  },
+  describe: (input) => `follow-up to hub agent ${String(input.id)}: ${String(input.prompt).slice(0, 80)}`,
+  async run(input) {
+    const meta = continueHubAgent(str(input, "id"), str(input, "prompt"));
+    return `Started ${meta.id}, continuing ${str(input, "id")}.`;
+  },
+};
+
+export const hubTools: Tool[] = [hubStartTool, hubListTool, hubOutputTool, hubSendTool, hubStopTool];

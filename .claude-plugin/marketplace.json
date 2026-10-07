@@ -8,6 +8,28 @@
   },
   "plugins": [
     {
+      "name": "fotohub",
+      "description": "FOTOhub for FH Code: FOTOhub API integration skills, media generation with FOTOhub's MCP tools, commerce integrations, and FOTOhub agents",
+      "version": "1.0.0",
+      "author": {
+        "name": "FOTOhub",
+        "email": "dev@fotohub.app"
+      },
+      "source": "./plugins/fotohub",
+      "category": "development"
+    },
+    {
+      "name": "fh-code-ui",
+      "description": "FH Code's look inside the engine: the FOTOhub API hero above the prompt, with a gradient wordmark, live wallet and quick actions",
+      "version": "0.1.0",
+      "author": {
+        "name": "FOTOhub",
+        "email": "dev@fotohub.app"
+      },
+      "source": "./plugins/fh-code-ui",
+      "category": "productivity"
+    },
+    {
       "name": "agent-sdk-dev",
       "description": "Development kit for working with the Claude Agent SDK",
       "source": "./plugins/agent-sdk-dev",

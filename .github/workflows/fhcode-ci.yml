@@ -41,3 +41,8 @@ jobs:
 
       - name: Typecheck, build and test
         run: npm test
+
+      - name: Test the fh-code-ui mod in the engine
+        run: claude plugin test ../plugins/fh-code-ui
+        env:
+          CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1"

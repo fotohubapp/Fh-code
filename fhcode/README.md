@@ -8,11 +8,25 @@ FH Code is Claude Code running on the FOTOhub API. You get the same terminal int
 
 Every model turn goes to `apis.fotohub.app` and is billed to the prepaid wallet of your fotohub.app account, within that account's limits. No Anthropic account is needed.
 
-FH Code adds four things on top:
+FH Code adds these on top:
 
-- **The FOTOhub look.** A purple FOTOhub theme, a status line (`FH Code · Sonnet 4.6 · wallet $42.50 · session $0.12`), and FOTOhub start-up notes, tips and spinner words.
+- **The FOTOhub look.**
+  - **The FOTOhub API hero.** A start-up panel above the prompt with a violet-to-rose gradient wordmark, the live wallet, and quick actions. It steps aside when you start working; `/fh` shows it again.
+  - **The FOTOhub theme.** A violet theme, with the mascot recoloured to match.
+  - **A status line:** `FH Code · Sonnet 4.6 · wallet $42.50 · session $0.12`.
+  - **FOTOhub start-up notes, tips and spinner words.**
+- **The `fotohub` plugin, built in.**
+  - **Skills:**
+    - `fotohub-api` covers calling the API correctly: docs first, keys, 402 handling, webhooks and signatures, rate limits, and cost preflight.
+    - `fotohub-generation` covers generating media in the session.
+    - `fotohub-commerce` covers the store integrations.
+  - **Commands:** `/fotohub:integrate`, `/fotohub:generate` and `/fotohub:wallet`.
+  - **Agents:** `fotohub-integrator` and `fotohub-docs-expert`.
 - **FOTOhub integrations.** FOTOhub's MCP server is built in, with image, video, audio, 3D, storage, pricing and wallet tools. FH Code's own MCP server adds the docs.fotohub.app search and reader, the wallet, top-up packages and the agent hub.
-- **An agent hub.** Background agents (`fhcode agents`) and a dashboard in the browser (`fhcode hub`).
+- **An agent hub.**
+  - Background agents (`fhcode agents`), with follow-ups that continue an agent's session (`fhcode agents send`).
+  - A dashboard in the browser (`fhcode hub`).
+- **A cost ledger.** Every FOTOhub turn is recorded. `fhcode usage` sums it up by day, model, project and source, and the dashboard charts it.
 - **Updates from FOTOhub.** `fhcode update` installs new releases, and the `fh-code-plugins` marketplace comes preconfigured.
 
 ## Install
@@ -53,9 +67,11 @@ Inside a session, everything works as in Claude Code. A few things are FOTOhub-s
 |---------|--------------|
 | `fhcode login [key]` / `logout` | Save or remove your FOTOhub API key |
 | `fhcode wallet` / `packages` | Wallet balance, monthly limit, tier; top-up packages |
+| `fhcode usage [--days 30]` | What FH Code spent: by day, model, project, and interactive vs background |
 | `fhcode docs <query>` | Search docs.fotohub.app |
 | `fhcode agents run "prompt"` | Start a background agent (`--name`, `--mode`, `--allow-tool`) |
 | `fhcode agents` / `agents logs <id> [-f]` / `agents stop <id>` | Watch and steer background agents |
+| `fhcode agents send <id> "message"` | Give a finished agent a follow-up; it continues in the same session |
 | `fhcode hub` | The agent hub dashboard in the browser |
 | `fhcode update [--check]` | Install the latest FH Code release |
 | `fhcode gateway` | Run only the gateway, e.g. for the Claude Code IDE extensions |
@@ -97,7 +113,13 @@ fhcode ─┬─ FH Code gateway  127.0.0.1:<random>, Anthropic Messages API, ra
 
   These features are not available through the FOTOhub endpoint.
 
-What stays Anthropic's: the engine is Anthropic's Claude Code, installed by you under Anthropic's terms. FH Code does not ship or modify it, so its own start-up header still names Claude Code.
+What stays Anthropic's: the engine is Anthropic's Claude Code, installed by you under Anthropic's terms. FH Code does not ship or modify it, so the start-up header's text and the mascot's shape are the engine's own.
+
+FH Code changes the rest through the engine's supported extension points:
+
+- the theme, including the mascot's colour,
+- settings: the status line, notes, tips and spinner words,
+- the `fh-code-ui` mod, which draws the FOTOhub API hero with the engine's function-hook UI API.
 
 ## Agent hub
 
@@ -105,6 +127,7 @@ What stays Anthropic's: the engine is Anthropic's Claude Code, installed by you 
 fhcode agents run "write tests for src/payments" --name tests --allow-tool "Bash(npm test:*)"
 fhcode agents                     # status, FOTOhub cost, turns, last tool
 fhcode agents logs <id> -f
+fhcode agents send <id> "now add the docs"   # continue its session
 fhcode agents stop <id>
 fhcode hub                        # dashboard on 127.0.0.1:7878 (token in the printed URL)
 ```

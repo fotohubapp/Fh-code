@@ -38,6 +38,8 @@ export interface HubAgentMeta {
   parent?: string;
   /** "engine" (Claude Code on the FOTOhub API) or "lite" (the built-in agent). */
   engine?: "engine" | "lite";
+  /** Set on a follow-up: the session it continues. */
+  resumeSession?: string;
 }
 
 export type HubAgentStatus = "running" | "done" | "failed" | "stopped" | "exited";
@@ -50,6 +52,8 @@ export interface HubAgentState extends HubAgentMeta {
   lastActivity?: string;
   output: string;
   error?: string;
+  /** The engine or lite session id, which a follow-up resumes. */
+  sessionId?: string;
 }
 
 export interface StartOptions {
@@ -63,6 +67,8 @@ export interface StartOptions {
   parent?: string;
   /** Which agent runs it; defaults to the engine when it is installed. */
   engine?: "engine" | "lite";
+  /** Continue this engine or lite session instead of starting a new one. */
+  resumeSession?: string;
 }
 
 const ENGINE_MODES: Record<PermissionMode, string> = { plan: "plan", default: "default", "accept-edits": "acceptEdits", yolo: "bypassPermissions" };
@@ -82,6 +88,7 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
     startedAt: new Date().toISOString(),
     parent: options.parent,
     engine: options.engine ?? (findEngine() ? "engine" : "lite"),
+    resumeSession: options.resumeSession,
   };
   let args: string[];
   if (meta.engine === "engine") {
@@ -90,11 +97,13 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
     args = [BIN, "-p", options.prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", ENGINE_MODES[meta.mode]];
     if (meta.mode === "yolo") args.push("--dangerously-skip-permissions");
     if (options.model) args.push("--model", options.model);
+    if (options.resumeSession) args.push("--resume", options.resumeSession);
     if (meta.allowTools.length) args.push("--allowedTools", ...meta.allowTools);
   } else {
     args = [BIN, "lite", "-p", options.prompt, "--output-format", "stream-json", "--mode", meta.mode, "--cwd", meta.cwd];
     if (options.model) args.push("--model", options.model);
     if (options.maxBudgetUsd) args.push("--max-budget-usd", String(options.maxBudgetUsd));
+    if (options.resumeSession) args.push("--resume", options.resumeSession);
     for (const t of meta.allowTools) args.push("--allow-tool", t);
   }
 
@@ -117,6 +126,24 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
   meta.pid = child.pid;
   writeFileSync(path.join(dir, "meta.json"), JSON.stringify(meta, null, 2));
   return meta;
+}
+
+/** Sends a finished agent a follow-up: a new hub run that continues its session. */
+export function continueHubAgent(id: string, prompt: string): HubAgentMeta {
+  const prev = getHubAgent(id);
+  if (prev.status === "running") throw new Error(`Agent ${id} is still running; wait for it or stop it first.`);
+  if (!prev.sessionId) throw new Error(`Agent ${id} has no session to continue.`);
+  return startHubAgent({
+    prompt,
+    cwd: prev.cwd,
+    name: `${prev.name.replace(/ ↳.*$/, "")} ↳ ${prompt.split("\n")[0].slice(0, 32)}`,
+    mode: prev.mode,
+    model: prev.model,
+    allowTools: prev.allowTools,
+    engine: prev.engine,
+    resumeSession: prev.sessionId,
+    parent: id,
+  });
 }
 
 export function listHubAgents(): HubAgentState[] {
@@ -159,6 +186,12 @@ export function getHubAgent(id: string): HubAgentState {
       case "usage":
         state.turns++;
         if (typeof e.sessionUsd === "number") state.costUsd = e.sessionUsd;
+        break;
+      case "session_start":
+        if (typeof e.sessionId === "string") state.sessionId = e.sessionId;
+        break;
+      case "system":
+        if (e.subtype === "init" && typeof e.session_id === "string") state.sessionId = e.session_id;
         break;
       case "error":
         finished = "failed";

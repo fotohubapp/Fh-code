@@ -12,12 +12,16 @@ import { extractSection, normalizeDocsPath } from "../dist/docs/search.js";
 import { parseAgentStream } from "../dist/api/sse.js";
 import { parseManifest } from "../dist/update.js";
 import { parseArgs } from "../dist/cli.js";
+import { summarizeUsage } from "../dist/usage.js";
 
 const repoPlugins = fileURLToPath(new URL("../../plugins", import.meta.url));
 
 test("every plugin in this repository loads into FH Code", () => {
   const ext = loadExtensions(mkdtempSync(path.join(os.tmpdir(), "fhcode-ws-")), {}, [repoPlugins]);
-  assert.equal(ext.plugins.length, 13);
+  assert.equal(ext.plugins.length, 15);
+  for (const cmd of ["fotohub:integrate", "fotohub:generate", "fotohub:wallet"]) assert.ok(ext.commands.has(cmd), `missing command ${cmd}`);
+  for (const skill of ["fotohub-api", "fotohub-generation", "fotohub-commerce"]) assert.ok(ext.skills.has(skill), `missing skill ${skill}`);
+  assert.ok(ext.agents.has("fotohub-integrator"));
   for (const cmd of ["commit", "commit-commands:commit", "feature-dev", "code-review", "ralph-loop", "hookify"]) {
     assert.ok(ext.commands.has(cmd), `missing command ${cmd}`);
   }
@@ -94,6 +98,21 @@ test("update manifests", () => {
   assert.ok(!isNewer("0.2.0", "0.2.0"));
   assert.equal(parseManifest({ tag_name: "fhcode-v0.4.1", assets: [{ name: "fh-code-0.4.1.tgz", browser_download_url: "https://x/y.tgz" }] }).version, "0.4.1");
   assert.equal(parseManifest({ version: "v1.0.0", tarball: "https://x.tgz" }).version, "1.0.0");
+});
+
+test("usage summary by day, model, project and source", () => {
+  const e = (ts, model, usd, cwd, source) => ({ ts, model, usd, cwd, source, inputTokens: 100, outputTokens: 10 });
+  const s = summarizeUsage([
+    e("2026-10-01T10:00:00Z", "claude-sonnet-4.6", 0.5, "/a", "engine"),
+    e("2026-10-01T11:00:00Z", "claude-haiku-4.5", 0.1, "/b", "hub"),
+    e("2026-10-02T09:00:00Z", "claude-sonnet-4.6", 0.25, "/a", "engine"),
+  ]);
+  assert.ok(Math.abs(s.total.usd - 0.85) < 1e-9);
+  assert.equal(s.total.turns, 3);
+  assert.deepEqual(s.byDay.map((d) => d.key), ["2026-10-01", "2026-10-02"]);
+  assert.equal(s.byModel[0].key, "claude-sonnet-4.6");
+  assert.equal(s.byProject[0].key, "/a");
+  assert.deepEqual(s.bySource.map((r) => r.key), ["engine", "hub"]);
 });
 
 test("command-line parsing", () => {

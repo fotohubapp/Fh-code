@@ -26,6 +26,8 @@ import { CONFIG_DIR, type FhcodeConfig } from "../config.js";
 import { fotohubMcpConfig } from "../mcp/manager.js";
 import { startGateway } from "../gateway/server.js";
 import { ENGINE_MODELS } from "../gateway/translate.js";
+import { FOTOHUB_PLUGIN_DIR, UI_PLUGIN_DIR } from "../bundled.js";
+import { recordUsage } from "../usage.js";
 
 export const ENGINE_HOME = path.join(CONFIG_DIR, "engine");
 const BIN = fileURLToPath(new URL("../../bin/fhcode.js", import.meta.url));
@@ -70,6 +72,9 @@ function theme(name: string, base: "dark" | "light", c: typeof PURPLE_DARK) {
       autoAcceptShimmer: c.shimmer,
       skill: c.accent,
       merged: c.accent,
+      // The start-up mascot, in FOTOhub violet.
+      clawd_body: c.border,
+      briefLabelClaude: c.accent,
     },
   };
 }
@@ -88,9 +93,20 @@ export function prepareEngineHome(config: FhcodeConfig): { mcpConfigFile: string
   writeFileSync(path.join(ENGINE_HOME, "themes", "fotohub-dark.json"), JSON.stringify(theme("FOTOhub dark", "dark", PURPLE_DARK), null, 2));
   writeFileSync(path.join(ENGINE_HOME, "themes", "fotohub-light.json"), JSON.stringify(theme("FOTOhub light", "light", PURPLE_LIGHT), null, 2));
 
-  // First run: start in the FOTOhub theme. Later the user's /theme choice is kept.
+  // Switch to the FOTOhub theme once: on the first run, and once for a home
+  // that predates the theme (still on a built-in dark or light theme). After
+  // that the user's /theme choice is kept.
   const state = path.join(ENGINE_HOME, ".claude.json");
-  if (!existsSync(state)) writeFileSync(state, JSON.stringify({ theme: "custom:fotohub-dark" }, null, 2), { mode: 0o600 });
+  const marker = path.join(ENGINE_HOME, ".fhcode-theme");
+  if (!existsSync(marker)) {
+    const current = readJson(state);
+    const theme = typeof current.theme === "string" ? current.theme : "";
+    if (!theme || /^(dark|light)(-|$)/.test(theme)) {
+      current.theme = theme.startsWith("light") ? "custom:fotohub-light" : "custom:fotohub-dark";
+      writeFileSync(state, JSON.stringify(current, null, 2), { mode: 0o600 });
+    }
+    writeFileSync(marker, "applied\n");
+  }
 
   // FH Code owns these keys; everything else in settings.json is the user's.
   const settingsFile = path.join(ENGINE_HOME, "settings.json");
@@ -153,6 +169,8 @@ function engineEnv(gatewayUrl: string, token: string, config: FhcodeConfig): Nod
     DISABLE_TELEMETRY: "1",
     DISABLE_ERROR_REPORTING: "1",
     MAX_THINKING_TOKENS: "0",
+    // The fh-code-ui mod draws with function hooks.
+    CLAUDE_CODE_ENABLE_FUNCTION_HOOKS: "1",
     FHCODE_GATEWAY_URL: gatewayUrl,
     FHCODE_GATEWAY_TOKEN: token,
   });
@@ -173,13 +191,27 @@ export async function launchEngine(engine: string, args: string[], config: Fhcod
     defaultModel: config.model,
     maxBudgetUsd: config.maxBudgetUsd,
     accountProvider: config.accountLimitsUrl ? new HttpAccountProvider(config.accountLimitsUrl, config.apiKey!) : undefined,
+    onTurn: (t) => recordUsage({ model: t.model, inputTokens: t.inputTokens, outputTokens: t.outputTokens, usd: t.chargedUsd, cwd: process.cwd() }),
   });
   options.onGateway?.(gateway.url);
 
   const isSession = !(args[0] && ENGINE_SUBCOMMANDS.has(args[0]));
-  // --mcp-config takes several values, so a single-value option follows it
-  // before the user's own arguments (which may start with the prompt).
-  const engineArgs = isSession ? ["--mcp-config", mcpConfigFile, "--append-system-prompt", FOTOHUB_SYSTEM_PROMPT, ...args] : args;
+  // --mcp-config takes several values, so single-value options follow it
+  // before the user's own arguments (which may start with the prompt). The
+  // bundled fotohub plugin comes with every FH Code release.
+  const engineArgs = isSession
+    ? [
+        "--mcp-config",
+        mcpConfigFile,
+        "--plugin-dir",
+        FOTOHUB_PLUGIN_DIR.replace(/[\\/]$/, ""),
+        "--plugin-dir",
+        UI_PLUGIN_DIR.replace(/[\\/]$/, ""),
+        "--append-system-prompt",
+        FOTOHUB_SYSTEM_PROMPT,
+        ...args,
+      ]
+    : args;
 
   const child = spawn(engine, engineArgs, { stdio: "inherit", env: engineEnv(gateway.url, gateway.token, config) });
   // Ctrl+C belongs to the engine's interface; FH Code just waits for it to finish.

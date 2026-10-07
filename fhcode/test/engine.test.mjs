@@ -160,6 +160,8 @@ test("fhcode runs the Claude Code engine on the FOTOhub API, with FOTOhub MCP", 
     const init = events.find((e) => e.type === "system" && e.subtype === "init");
     assert.ok(init.tools.includes("mcp__fotohub__check_balance"), "FOTOhub MCP tools reach the engine");
     assert.ok(init.tools.includes("mcp__fh-code__fotohub_docs_search"), "FH Code MCP tools reach the engine");
+    assert.ok(init.plugins?.some((p) => p.name === "fotohub"), `bundled fotohub plugin loads: ${JSON.stringify(init.plugins)}`);
+    assert.ok(init.slash_commands?.some((c) => c.startsWith("fotohub:")), "fotohub commands reach the engine");
     assert.ok(events.some((e) => e.type === "user" && JSON.stringify(e).includes("hello from the workspace")), "the engine ran its Read tool");
     assert.equal(events.find((e) => e.type === "result").result, "The file says hello.");
     assert.deepEqual(events.at(-1), { type: "fh_billing", sessionUsd: 0.007, turns: 2 });

@@ -30,7 +30,7 @@ export async function serveMcp(cwd: string): Promise<number> {
   }
   const hubAllowed = !process.env.FHCODE_HUB_AGENT_ID;
   for (const t of hubTools) {
-    if (!hubAllowed && (t.definition.name === "hub_start_agent" || t.definition.name === "hub_stop_agent")) continue;
+    if (!hubAllowed && ["hub_start_agent", "hub_stop_agent", "hub_send_agent"].includes(t.definition.name)) continue;
     tools.push(t);
   }
   const byName = new Map(tools.map((t) => [t.definition.name, t]));

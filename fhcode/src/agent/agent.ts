@@ -14,10 +14,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { AGENT_MODELS, FotohubClient, type ContentBlock, type Message, type ToolDefinition } from "../api/client.js";
 import { AccountGuard, FotohubApiAccountProvider, type AccountProvider } from "../account/guard.js";
+import { BUNDLED_PLUGINS_DIR } from "../bundled.js";
 import { loadExtensions, type AgentDef, type Extensions } from "../extensions/index.js";
 import { HookRunner, type HookOutcome } from "../hooks.js";
 import { FOTOHUB_MCP_NAME, fotohubMcpConfig, McpManager, type McpServerConfig } from "../mcp/manager.js";
 import { Transcript } from "../sessions.js";
+import { recordUsage } from "../usage.js";
 import { loadSettings, mergeHooks, type HookEvent, type Settings } from "../settings.js";
 import { defaultTools } from "../tools/index.js";
 import { DEFAULT_DOCS_SOURCE } from "../tools/docs.js";
@@ -113,7 +115,7 @@ export class FotohubCodeAgent {
     this.model = options.model;
     this.messages = options.messages ? [...options.messages] : [];
     this.settings = options.settings ?? loadSettings(options.cwd);
-    this.extensions = loadExtensions(options.cwd, this.settings, options.pluginDirs);
+    this.extensions = loadExtensions(options.cwd, this.settings, [BUNDLED_PLUGINS_DIR, ...(options.pluginDirs ?? [])]);
     const hooks = { ...(this.settings.hooks ?? {}) };
     mergeHooks(hooks, this.extensions.hooks);
     this.hooks = new HookRunner(hooks);
@@ -137,7 +139,7 @@ export class FotohubCodeAgent {
     if (options.hub !== false) {
       for (const t of hubTools) {
         // Background agents may watch the hub but not start more agents.
-        if (process.env.FHCODE_HUB_AGENT_ID && (t.definition.name === "hub_start_agent" || t.definition.name === "hub_stop_agent")) continue;
+        if (process.env.FHCODE_HUB_AGENT_ID && ["hub_start_agent", "hub_stop_agent", "hub_send_agent"].includes(t.definition.name)) continue;
         this.tools.set(t.definition.name, t);
       }
     }
@@ -278,6 +280,14 @@ export class FotohubCodeAgent {
         } else if (frame.type === "done") {
           stopReason = frame.stop_reason;
           const charged = this.guard.record(frame.billing);
+          recordUsage({
+            model: p.model,
+            inputTokens: frame.usage?.input_tokens ?? 0,
+            outputTokens: frame.usage?.output_tokens ?? 0,
+            usd: charged,
+            cwd: this.cwd,
+            source: "lite",
+          });
           p.emit({
             type: "usage",
             inputTokens: frame.usage?.input_tokens ?? 0,

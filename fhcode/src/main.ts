@@ -15,10 +15,11 @@ import { resolveConfig } from "./config.js";
 import { ENGINE_INSTALL_HELP, findEngine, launchEngine, statusLine } from "./engine/launch.js";
 import { startGateway } from "./gateway/server.js";
 import { serveMcp } from "./mcp/server.js";
+import { recordUsage } from "./usage.js";
 import { VERSION } from "./version.js";
 
 /** Subcommands FH Code handles itself; everything else goes to the engine. */
-const OWN = new Set(["login", "logout", "wallet", "packages", "docs", "agents", "hub", "sessions", "update"]);
+const OWN = new Set(["login", "logout", "wallet", "packages", "docs", "agents", "hub", "sessions", "update", "usage"]);
 
 const HELP = `FH Code ${VERSION} — FOTOhub Code
 
@@ -29,8 +30,9 @@ const HELP = `FH Code ${VERSION} — FOTOhub Code
 
   fhcode login [fh_live_...]   save your FOTOhub API key (fotohub.app/settings/api)
   fhcode wallet | packages     FOTOhub wallet, limits and top-up packages
+  fhcode usage [--days 30]     what FH Code spent: by day, model, project
   fhcode docs <query>          search docs.fotohub.app
-  fhcode agents run "prompt"   background agent;  fhcode agents [logs|stop] <id>
+  fhcode agents run "prompt"   background agent;  fhcode agents [logs|send|stop] <id>
   fhcode hub                   agent hub dashboard in the browser
   fhcode update                install the latest FH Code release
   fhcode gateway               run only the FOTOhub gateway (for IDE extensions)
@@ -72,7 +74,13 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 async function gatewayOnly(config: ReturnType<typeof resolveConfig>): Promise<number> {
-  const gateway = await startGateway({ apiKey: config.apiKey!, baseUrl: config.baseUrl, defaultModel: config.model, maxBudgetUsd: config.maxBudgetUsd });
+  const gateway = await startGateway({
+    apiKey: config.apiKey!,
+    baseUrl: config.baseUrl,
+    defaultModel: config.model,
+    maxBudgetUsd: config.maxBudgetUsd,
+    onTurn: (t) => recordUsage({ model: t.model, inputTokens: t.inputTokens, outputTokens: t.outputTokens, usd: t.chargedUsd, cwd: process.cwd() }),
+  });
   stdout.write(
     `FH Code gateway on ${gateway.url}\nPoint a Claude Code client at it:\n\n` +
       `  export ANTHROPIC_BASE_URL=${gateway.url}\n  export ANTHROPIC_AUTH_TOKEN=${gateway.token}\n\nCtrl+C stops it.\n`,

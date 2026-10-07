@@ -1,13 +1,16 @@
 # FH Code (FOTOhub Code)
 
+![FH Code: the FOTOhub API hero above the prompt](./docs/images/fhcode-hero.png)
+
 FH Code is Claude Code running on the FOTOhub API. You get the same terminal interface, agents, plugins, MCP and hooks, but every turn is billed to the prepaid wallet of your [fotohub.app](https://fotohub.app) account, within that account's limits.
 
 On top of Claude Code, FH Code adds:
 
-- the FOTOhub look: theme, status line with the wallet, start-up notes and tips,
+- the FOTOhub look: the FOTOhub API hero above the prompt, a violet theme, a status line with the wallet, start-up notes and tips,
+- the built-in `fotohub` plugin: skills, `/fotohub:*` commands and agents for building on the FOTOhub API,
 - FOTOhub's MCP tools for image, video, audio, 3D, storage, pricing and the wallet,
 - a docs.fotohub.app search,
-- an agent hub for background agents,
+- an agent hub for background agents, with follow-ups and a cost ledger (`fhcode usage`),
 - updates from FOTOhub.
 
 ```bash
@@ -35,7 +38,7 @@ The full guide, including how the gateway works, is in [fhcode/README.md](./fhco
 | Path | Contents |
 |------|----------|
 | [`fhcode/`](./fhcode) | FH Code: the FOTOhub gateway, the engine launcher, the agent hub, the lite agent, MCP, the docs index, and tests |
-| [`plugins/`](./plugins) | FH Code plugins, published as the `fh-code-plugins` marketplace ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)) |
+| [`plugins/`](./plugins) | FH Code plugins, published as the `fh-code-plugins` marketplace ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)); `fotohub` and `fh-code-ui` ship inside FH Code |
 | [`examples/`](./examples) | Example settings, hooks, MDM profiles and gateway deployments |
 | [`mods/`](./mods) | Function-hook mods |
 | [`.devcontainer/`](./.devcontainer) | A sandboxed dev container |

@@ -8,7 +8,11 @@ Guidance for FH Code, Claude Code and other coding agents working in this reposi
 dependencies. `fhcode` runs the Claude Code engine through FH Code's gateway
 (`src/gateway/`), which translates the Anthropic Messages API to the FOTOhub
 agent endpoint; `src/engine/launch.ts` sets up the engine's home, theme, status
-line and MCP servers. `fhcode lite` is FH Code's own agent (`src/agent/`). Run `npm ci && npm test` in `fhcode/` after changing
+line and MCP servers. `fhcode lite` is FH Code's own agent (`src/agent/`).
+Two plugins ship inside FH Code and load in every engine session:
+`plugins/fotohub` (skills, commands and agents for the FOTOhub API) and
+`plugins/fh-code-ui` (a mod drawing the FOTOhub API hero above the prompt; test
+it with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test plugins/fh-code-ui`). Run `npm ci && npm test` in `fhcode/` after changing
 it; the tests run against a mock FOTOhub API and also load every plugin in
 `plugins/`, so a plugin change can break them. FOTOhub API details (endpoints,
 fields, prices) come from docs.fotohub.app, whose source is the fotohubapp/docs

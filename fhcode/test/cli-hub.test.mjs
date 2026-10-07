@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { getHubAgent, listHubAgents, startHubAgent, startHubServer } from "../dist/index.js";
+import { continueHubAgent } from "../dist/hub/store.js";
 
 const bin = fileURLToPath(new URL("../bin/fhcode.js", import.meta.url));
 
@@ -63,7 +64,7 @@ test("lite: interactive session over piped input: prompt, slash commands, exit",
 });
 
 test("a background hub agent runs to completion and reports cost and output", async () => {
-  const api = await startMockApi({ turns: [text("background work done", 0.02)] });
+  const api = await startMockApi({ turns: [text("background work done", 0.02), text("tests written", 0.01)] });
   const env = { FOTOHUB_API_KEY: process.env.FOTOHUB_API_KEY, FOTOHUB_BASE_URL: process.env.FOTOHUB_BASE_URL };
   process.env.FOTOHUB_API_KEY = KEY;
   process.env.FOTOHUB_BASE_URL = api.baseUrl;
@@ -78,7 +79,22 @@ test("a background hub agent runs to completion and reports cost and output", as
     assert.equal(state.status, "done", state.error);
     assert.equal(state.output, "background work done");
     assert.equal(state.costUsd, 0.02);
+    assert.ok(state.sessionId, "the agent's session id is known");
     assert.ok(listHubAgents().some((a) => a.id === meta.id));
+
+    // A follow-up continues the same session: the model sees the earlier turn.
+    const follow = continueHubAgent(meta.id, "and now the tests");
+    let next;
+    for (let i = 0; i < 100; i++) {
+      next = getHubAgent(follow.id);
+      if (next.status !== "running") break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.equal(next.status, "done", next.error);
+    assert.equal(next.parent, meta.id);
+    const resumed = api.agentRequests().at(-1).body.messages;
+    assert.equal(resumed.length, 3);
+    assert.match(JSON.stringify(resumed[0]), /do the thing/);
 
     const server = await startHubServer({ port: 0, cwd: ws() });
     try {

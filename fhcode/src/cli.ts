@@ -17,7 +17,7 @@ import { CONFIG_DIR, maskKey, resolveConfig, updateConfigFile, type FhcodeConfig
 import { searchDocs } from "./docs/search.js";
 import { loadExtensions, renderCommand } from "./extensions/index.js";
 import { addMarketplace, installPlugin, listMarketplaces, marketplacePlugins, removePlugin, updateMarketplaces } from "./extensions/install.js";
-import { getHubAgent, listHubAgents, readEvents, removeHubAgent, startHubAgent, stopHubAgent } from "./hub/store.js";
+import { continueHubAgent, getHubAgent, listHubAgents, readEvents, removeHubAgent, startHubAgent, stopHubAgent } from "./hub/store.js";
 import { startHubServer } from "./hub/server.js";
 import { LineReader } from "./lines.js";
 import { fotohubMcpConfig, McpManager, type McpServerConfig } from "./mcp/manager.js";
@@ -26,6 +26,7 @@ import { loadSettings } from "./settings.js";
 import { packagesTool, walletTool } from "./tools/account.js";
 import type { ToolContext } from "./tools/types.js";
 import { backgroundUpdateCheck, fetchLatest, installUpdate, isNewer } from "./update.js";
+import { readUsage, summarizeUsage, type UsageRow } from "./usage.js";
 import { VERSION } from "./version.js";
 
 const useColor = stdout.isTTY && !process.env.NO_COLOR && process.env.TERM !== "dumb";
@@ -53,6 +54,7 @@ export interface ParsedArgs {
   maxTurns?: number;
   name?: string;
   port?: number;
+  days?: number;
   continue: boolean;
   resume?: string | true;
   follow: boolean;
@@ -63,7 +65,7 @@ export interface ParsedArgs {
   check: boolean;
 }
 
-const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions"]);
+const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions", "usage"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   const out: ParsedArgs = {
@@ -156,6 +158,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case "--port":
         out.port = Number(need(i++, a));
         break;
+      case "--days": {
+        const v = Number(need(i++, a));
+        if (!Number.isFinite(v) || v <= 0) throw new Error("--days must be a positive number.");
+        out.days = v;
+        break;
+      }
       case "-c":
       case "--continue":
         out.continue = true;
@@ -207,6 +215,7 @@ Agent hub
   fhcode agents run "prompt"      start a background agent (--name, --mode, --allow-tool)
   fhcode agents                   list background agents
   fhcode agents logs <id> [-f]    show an agent's output (follow with -f)
+  fhcode agents send <id> "msg"   continue a finished agent in its session
   fhcode agents stop <id>         stop an agent;  fhcode agents rm <id> removes it
   fhcode hub [--port 7878]        open the hub dashboard in the browser
 
@@ -285,6 +294,8 @@ export async function liteMain(argv: string[]): Promise<number> {
         return await hubCommand(args, config);
       case "sessions":
         return sessionsCommand(args);
+      case "usage":
+        return usageCommand(args);
     }
   } catch (err) {
     stderr.write(`${red(describeError(err))}\n`);
@@ -662,6 +673,28 @@ function printSessions(cwd?: string): void {
   stdout.write(dim("Resume with: fhcode lite --resume <id>\n"));
 }
 
+function usageCommand(args: ParsedArgs): number {
+  const days = args.days ?? 30;
+  const s = summarizeUsage(readUsage(days));
+  if (!s.total.turns) {
+    stdout.write(`No FH Code usage in the last ${days} days.\n`);
+    return 0;
+  }
+  const row = (r: UsageRow, label = r.key) =>
+    `  ${label.padEnd(40).slice(0, 40)} $${fmt(r.usd).padStart(9)}  ${String(r.turns).padStart(5)} turns  ${(r.inputTokens + r.outputTokens).toLocaleString("en-US").padStart(12)} tokens\n`;
+  stdout.write(`${bold(`FH Code usage, last ${days} days`)}: $${fmt(s.total.usd)} over ${s.total.turns} turns\n`);
+  stdout.write(`\n${bold("By day")}\n`);
+  const max = Math.max(...s.byDay.map((d) => d.usd), 0.000001);
+  for (const d of s.byDay.slice(-14)) stdout.write(`  ${d.key}  ${purple("█".repeat(Math.max(1, Math.round((d.usd / max) * 30))))} $${fmt(d.usd)}\n`);
+  stdout.write(`\n${bold("By model")}\n`);
+  for (const r of s.byModel) stdout.write(row(r));
+  stdout.write(`\n${bold("By project")}\n`);
+  for (const r of s.byProject.slice(0, 10)) stdout.write(row(r, r.key.replace(process.env.HOME ?? "\u0000", "~")));
+  stdout.write(`\n${bold("By source")}\n`);
+  for (const r of s.bySource) stdout.write(row(r, r.key === "hub" ? "hub (background agents)" : r.key));
+  return 0;
+}
+
 function sessionsCommand(args: ParsedArgs): number {
   printSessions(args.rest[0] === "all" ? undefined : args.cwd);
   return 0;
@@ -800,6 +833,14 @@ async function agentsCommand(args: ParsedArgs, config: FhcodeConfig): Promise<nu
         }
         await new Promise((r) => setTimeout(r, 1000));
       }
+    }
+    case "send": {
+      const [id, ...words] = rest;
+      const prompt = words.join(" ").trim();
+      if (!id || !prompt) throw new Error('Usage: fhcode agents send <id> "message"');
+      const meta = continueHubAgent(id, prompt);
+      stdout.write(`Started ${bold(meta.id)}, continuing ${id}. Follow it: fhcode agents logs ${meta.id} -f\n`);
+      return 0;
     }
     case "stop":
       stdout.write(stopHubAgent(rest[0] ?? "") ? `Stopped ${rest[0]}.\n` : `${rest[0]} was not running.\n`);

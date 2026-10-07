@@ -1,6 +1,7 @@
 /**
- * The fhcode command line: interactive sessions, headless runs (-p), and the
- * account, docs, MCP, plugin, agent hub and update subcommands.
+ * FH Code lite: the built-in agent's command line (`fhcode lite`), plus the
+ * account, docs, agent hub and update subcommands that `fhcode` itself uses.
+ * The default `fhcode` session runs the Claude Code engine (see engine/launch.ts).
  */
 
 import { createInterface } from "node:readline/promises";
@@ -193,14 +194,14 @@ export function parseArgs(argv: string[]): ParsedArgs {
   return out;
 }
 
-const HELP = `FH Code ${VERSION} — FOTOhub Code: coding, agents and FOTOhub integrations
+const HELP = `FH Code lite ${VERSION} — FH Code's built-in agent (no engine needed)
 
 Usage
-  fhcode                          interactive session in the current directory
-  fhcode "prompt"                 interactive session that starts with a prompt
-  fhcode -p "prompt"              run once and print the result (headless)
-  fhcode -c | --continue          continue the latest session here
-  fhcode -r | --resume [id]       resume a saved session
+  fhcode lite                     interactive session in the current directory
+  fhcode lite "prompt"            interactive session that starts with a prompt
+  fhcode lite -p "prompt"         run once and print the result (headless)
+  fhcode lite -c | --continue     continue the latest session here
+  fhcode lite -r | --resume [id]  resume a saved session
 
 Agent hub
   fhcode agents run "prompt"      start a background agent (--name, --mode, --allow-tool)
@@ -209,15 +210,11 @@ Agent hub
   fhcode agents stop <id>         stop an agent;  fhcode agents rm <id> removes it
   fhcode hub [--port 7878]        open the hub dashboard in the browser
 
-Integrations
-  fhcode mcp                      MCP servers and their status (FOTOhub is built in)
-  fhcode mcp add <name> <url>     add an HTTP server (--header "K: V", --project)
-  fhcode mcp add <name> -- <cmd>  add a stdio server
-  fhcode mcp remove <name>
-  fhcode plugin                   installed plugins, commands, agents, skills
-  fhcode plugin install <name>[@marketplace]   from fh-code-plugins by default
-  fhcode plugin remove <name>
-  fhcode plugin marketplace add <owner/repo|url|dir> | list | update
+Integrations of the lite agent
+  fhcode lite mcp                 MCP servers and their status (FOTOhub is built in)
+  fhcode lite mcp add <name> <url>   add an HTTP server (--header "K: V", --project)
+  fhcode lite plugin install <name>[@marketplace]   from fh-code-plugins by default
+  fhcode lite plugin marketplace add <owner/repo|url|dir> | list | update
 
 Account
   fhcode login [fh_live_...]      save your FOTOhub API key (fotohub.app/settings/api)
@@ -245,7 +242,7 @@ Options
   --api-key <key>                 FOTOhub API key (else FOTOHUB_API_KEY, else saved key)
 `;
 
-export async function main(argv: string[]): Promise<number> {
+export async function liteMain(argv: string[]): Promise<number> {
   let args: ParsedArgs;
   try {
     args = parseArgs(argv);
@@ -460,7 +457,7 @@ async function interactive(args: ParsedArgs, config: FhcodeConfig): Promise<numb
   }
   lines.close();
   await agent.close();
-  stdout.write(dim(`Session ${agent.sessionId} · cost $${fmt(agent.guard.sessionSpentUsd)} over ${agent.guard.sessionTurns} turns. Resume: fhcode -r ${agent.sessionId}\n`));
+  stdout.write(dim(`Session ${agent.sessionId} · cost $${fmt(agent.guard.sessionSpentUsd)} over ${agent.guard.sessionTurns} turns. Resume: fhcode lite -r ${agent.sessionId}\n`));
   return 0;
 }
 
@@ -662,7 +659,7 @@ function printSessions(cwd?: string): void {
     return;
   }
   for (const s of sessions) stdout.write(`${s.id}  ${dim(s.updatedAt.toISOString().slice(0, 16).replace("T", " "))}  ${s.title ?? ""}\n`);
-  stdout.write(dim("Resume with: fhcode --resume <id>\n"));
+  stdout.write(dim("Resume with: fhcode lite --resume <id>\n"));
 }
 
 function sessionsCommand(args: ParsedArgs): number {
@@ -823,6 +820,13 @@ function printHubEvent(e: Record<string, unknown>): void {
   else if (e.type === "subagent_start") stdout.write(`\n${blue("◆")} ${String(e.agentType)} ${dim(String(e.description ?? ""))}\n`);
   else if (e.type === "notice") stdout.write(yellow(`\n! ${String(e.text)}\n`));
   else if (e.type === "error") stdout.write(red(`\n${String(e.message)}\n`));
+  // Claude Code engine events
+  else if (e.type === "assistant" && !e.parent_tool_use_id) {
+    for (const block of ((e.message as { content?: Array<Record<string, unknown>> } | undefined)?.content ?? [])) {
+      if (block.type === "text") stdout.write(`${String(block.text)}\n`);
+      else if (block.type === "tool_use") stdout.write(dim(`● ${String(block.name)} ${summarizeInput((block.input as Record<string, unknown>) ?? {})}\n`));
+    }
+  } else if (e.type === "result" && e.is_error) stdout.write(red(`\n${String(e.result ?? e.subtype)}\n`));
 }
 
 async function hubCommand(args: ParsedArgs, config: FhcodeConfig): Promise<number> {

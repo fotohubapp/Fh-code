@@ -138,6 +138,12 @@ export class AccountGuard {
     return limits;
   }
 
+  /** The cached wallet balance minus what was spent since it was fetched. */
+  async estimatedBalance(signal?: AbortSignal): Promise<number> {
+    const limits = await this.limits(signal);
+    return limits.balanceUsd - this.spentSinceFetchUsd;
+  }
+
   /** Throws AccountLimitError when the next turn should not run. */
   async preflight(signal?: AbortSignal): Promise<void> {
     if (this.sessionBudgetUsd !== undefined && this.spentUsd >= this.sessionBudgetUsd) {

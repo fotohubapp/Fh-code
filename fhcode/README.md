@@ -1,248 +1,147 @@
 # FH Code (FOTOhub Code)
 
-FH Code is FOTOhub's coding and agent platform. You run it from the terminal (`fhcode`) or embed it as a library in FOTOhub apps.
+FH Code is Claude Code running on the FOTOhub API. You get the same terminal interface, with all of its features:
 
-- **Codes in your project.** It reads, searches and edits files, runs commands, and handles git.
-- **Delegates to subagents.** Subagents get their own context and can run in parallel.
-- **Runs background agents from a hub.** You control them from the CLI or a local dashboard.
-- **Uses FOTOhub and other integrations over MCP.** The FOTOhub MCP server is built in. It adds image, video, audio, 3D, storage and pricing tools. Any other MCP server can be added.
-- **Loads plugins.** Commands, agents, skills, hooks and MCP servers come in plugins, installed from marketplaces. Every plugin in this repository works as it is.
-- **Knows the FOTOhub docs.** All of docs.fotohub.app is indexed, and pages are read live.
-- **Bills your FOTOhub wallet.** Every model turn calls `POST /v1/ai/agent/stream` on the FOTOhub API. It is charged to the prepaid wallet of your fotohub.app account, within that account's limits.
+- the agent loop, subagents, plan and auto modes
+- plugins, skills, hooks and MCP
+- sessions, `/model`, `/compact` and every other command
+
+Every model turn goes to `apis.fotohub.app` and is billed to the prepaid wallet of your fotohub.app account, within that account's limits. No Anthropic account is needed.
+
+FH Code adds four things on top:
+
+- **The FOTOhub look.** A purple FOTOhub theme, a status line (`FH Code · Sonnet 4.6 · wallet $42.50 · session $0.12`), and FOTOhub start-up notes, tips and spinner words.
+- **FOTOhub integrations.** FOTOhub's MCP server is built in, with image, video, audio, 3D, storage, pricing and wallet tools. FH Code's own MCP server adds the docs.fotohub.app search and reader, the wallet, top-up packages and the agent hub.
+- **An agent hub.** Background agents (`fhcode agents`) and a dashboard in the browser (`fhcode hub`).
+- **Updates from FOTOhub.** `fhcode update` installs new releases, and the `fh-code-plugins` marketplace comes preconfigured.
 
 ## Install
 
-Requires Node.js 20 or newer.
+Requires Node.js 20 or newer, and the Claude Code engine (the `claude` command), which you install separately:
 
 ```bash
+curl -fsSL https://claude.ai/install.sh | bash          # macOS / Linux  (Windows: irm https://claude.ai/install.ps1 | iex)
 npm install -g https://github.com/fotohubapp/Fh-code/releases/latest/download/fh-code.tgz
-
-# or from source
-cd fhcode && npm ci && npm run build && npm link
+fhcode login                                             # API key from https://fotohub.app/settings/api
 ```
 
-Log in with an API key from [fotohub.app/settings/api](https://fotohub.app/settings/api):
-
-```bash
-fhcode login            # checks the key against your wallet and saves it to ~/.fhcode/config.json (0600)
-# or: export FOTOHUB_API_KEY=fh_live_...
-```
-
-If you already saved a key with the FOTOhub CLI, FH Code reads it from `~/.fotohub/config.json`.
+If FH Code cannot find `claude` on your PATH, set `FHCODE_ENGINE_BIN` to its path. To install FH Code from source, run `cd fhcode && npm ci && npm run build && npm link`.
 
 ## Use
 
 ```bash
-fhcode                                   # interactive session in the current directory
-fhcode "add input validation to the signup form"
-fhcode -c                                # continue the latest session here
-fhcode -r [id]                           # resume a saved session
-fhcode -p "explain src/billing.ts"       # headless: print the answer and exit
-fhcode -p "fix the failing test" --mode accept-edits --allow-tool "Bash(npm test:*)" --output-format stream-json
+fhcode                         # Claude Code on the FOTOhub API, in the current directory
+fhcode "add input validation"  # start with a prompt
+fhcode -c / -r                 # continue / resume
+fhcode -p "explain src/x.ts"   # headless; every Claude Code option works (--model, --permission-mode, --allowedTools, ...)
 ```
 
-### Slash commands
+Inside a session, everything works as in Claude Code. A few things are FOTOhub-specific:
+
+- **`/mcp`** shows `fotohub` (FOTOhub's tools) and `fh-code` (docs, wallet, packages, hub).
+- **`/model`** lists the FOTOhub models:
+  - Claude Sonnet 4.6 (the default)
+  - Claude Sonnet 4.5
+  - Claude Sonnet 4
+  - Claude Haiku 4.5
+- **`/plugin install feature-dev@fh-code-plugins`** installs plugins from this repository's marketplace.
+- **The status line** shows the wallet balance and what this session has cost on FOTOhub.
+
+### Commands of FH Code itself
 
 | Command | What it does |
 |---------|--------------|
-| `/wallet` | Wallet balance, monthly limit, tier and this session's spend |
-| `/packages` | Wallet top-up packages |
-| `/cost` | What this session has spent |
-| `/model [id]` | Show or switch the model: `claude-sonnet-4.6` (default), `claude-sonnet-4.5`, `claude-sonnet-4` or `claude-haiku-4.5` |
-| `/mode [mode]` | Show or set the permission mode |
-| `/agents` | Background agents in the hub |
-| `/mcp` | MCP servers and their tools |
-| `/plugins` | Plugins, subagents, skills, commands and hooks |
-| `/docs <query>` | Search docs.fotohub.app |
-| `/resume` | List saved sessions |
-| `/clear` | Start a fresh conversation |
-| `/exit` | Quit |
+| `fhcode login [key]` / `logout` | Save or remove your FOTOhub API key |
+| `fhcode wallet` / `packages` | Wallet balance, monthly limit, tier; top-up packages |
+| `fhcode docs <query>` | Search docs.fotohub.app |
+| `fhcode agents run "prompt"` | Start a background agent (`--name`, `--mode`, `--allow-tool`) |
+| `fhcode agents` / `agents logs <id> [-f]` / `agents stop <id>` | Watch and steer background agents |
+| `fhcode hub` | The agent hub dashboard in the browser |
+| `fhcode update [--check]` | Install the latest FH Code release |
+| `fhcode gateway` | Run only the gateway, e.g. for the Claude Code IDE extensions |
+| `fhcode engine ...` | The engine with the gateway, without FH Code's session flags |
+| `fhcode lite ...` | FH Code's built-in agent, which needs no engine (see below) |
 
-Plugins and markdown command files add their own commands, such as `/commit`, `/feature-dev` and `/code-review`.
+Anything else, such as `fhcode mcp add` or `fhcode plugin list`, goes to the engine.
 
-### Tools
+## How it works
 
-| Tool | Kind |
-|------|------|
-| `Read`, `Glob`, `Grep`, `WebFetch` | read |
-| `Write`, `Edit` | edit (only inside the workspace) |
-| `Bash` | command |
-| `Task` | runs a subagent |
-| `Skill` | loads a skill |
-| `fotohub_docs_search`, `fotohub_docs_read` | read docs.fotohub.app |
-| `fotohub_wallet`, `fotohub_packages` | read your account |
-| `fotohub_topup` | paid: creates a checkout link and charges nothing until you pay |
-| `hub_start_agent`, `hub_stop_agent` | command (background agents) |
-| `hub_list_agents`, `hub_agent_output` | read |
-| `mcp__fotohub__*` | FOTOhub MCP: lookups are reads, generation is paid |
-| `mcp__<server>__*` | other MCP servers: external unless the server marks the tool read-only |
+```
+fhcode ─┬─ FH Code gateway  127.0.0.1:<random>, Anthropic Messages API, random token
+        │      └─> POST https://apis.fotohub.app/v1/ai/agent/stream   (FOTOhub wallet)
+        └─ claude  (CLAUDE_CONFIG_DIR=~/.fhcode/engine, ANTHROPIC_BASE_URL=gateway)
+               ├─ MCP fotohub   https://apis.fotohub.app/mcp/
+               └─ MCP fh-code   fhcode mcp-serve  (docs.fotohub.app, wallet, packages, hub)
+```
 
-The tool names and input fields match the Claude Code tool protocol. That is why plugin hooks, agent definitions and `allowed-tools` lists written for it work unchanged.
+- **The gateway** turns Messages API requests into FOTOhub agent turns and FOTOhub's frames back into the Messages API event stream. It handles both streaming and non-streaming requests, tool use, and errors.
+  - **Removed before forwarding**, because the FOTOhub agent endpoint does not take them: prompt-caching markers, thinking blocks, server tools, and Anthropic's attribution line.
+  - **Model mapping.** Model ids map onto FOTOhub's agent models. A model FOTOhub does not serve, such as Opus, runs on the default model.
+- **Before every turn**, the gateway checks the account. It refuses the turn with a top-up link when:
+  - the wallet is empty,
+  - the monthly limit is reached, or
+  - the session budget (`FHCODE_MAX_BUDGET_USD`) is used up.
+- **Billing.** It records what FOTOhub charged for each turn. Headless runs with `--output-format stream-json` end with a line `{"type":"fh_billing","sessionUsd":…,"turns":…}`.
+- **Engine state.** The engine keeps its state (settings, sessions, plugins, theme) in `~/.fhcode/engine`, apart from any Claude Code install of your own. FH Code manages these keys of `settings.json`:
+  - `statusLine`
+  - `companyAnnouncements`
+  - `spinnerVerbs`
+  - `spinnerTipsOverride`
+  - the `fh-code-plugins` entry of `extraKnownMarketplaces`
 
-### Permission modes and rules
+  Everything else in that file is yours.
+- **Engine environment.** The engine runs with:
+  - non-essential traffic and telemetry off,
+  - experimental beta features off,
+  - extended thinking off.
 
-| Mode | Reads | Edits | Commands, paid and external tools |
-|------|-------|-------|-----------------------------------|
-| `plan` | yes | refused | refused |
-| `default` | yes | asks | asks |
-| `accept-edits` | yes | yes | asks |
-| `yolo` | yes | yes | yes |
+  These features are not available through the FOTOhub endpoint.
 
-Rules let a tool run without asking (`--allow-tool`, `permissions.allow` in settings) or refuse it (`--deny-tool`, `permissions.deny`). Examples:
-
-- `Bash(npm test)` allows exactly that command.
-- `Bash(git commit:*)` allows commands starting with `git commit`.
-- `Edit(src/**)` allows edits under `src/`.
-- `WebFetch(domain:fotohub.app)` allows fetches from that domain.
-- `mcp__fotohub` allows every tool of that MCP server.
-
-A headless run cannot ask, so anything that would ask is refused unless a rule or the mode allows it.
-
-## Subagents
-
-The `Task` tool hands a self-contained job to a subagent with its own context and tool set. When the model asks for several Task calls in one turn, they run in parallel.
-
-Built-in subagent types:
-
-| Type | What it does |
-|------|--------------|
-| `general-purpose` | Multi-step work with all tools |
-| `Explore` | Read-only search of the code |
-| `fotohub-docs` | Answers about the FOTOhub API and pricing from the docs, with links |
-
-You can add more:
-
-- **Where they live:** markdown files in `.fhcode/agents/`, `.claude/agents/`, `~/.fhcode/agents/`, or in plugins.
-- **Frontmatter fields:** `name`, `description`, `tools` and `model`. For `model`, `haiku` maps to `claude-haiku-4.5`; any other value uses the session's model.
+What stays Anthropic's: the engine is Anthropic's Claude Code, installed by you under Anthropic's terms. FH Code does not ship or modify it, so its own start-up header still names Claude Code.
 
 ## Agent hub
 
-Background agents work on their own while you do something else. Each one is a headless FH Code process billed to the same wallet. Its events are saved under `~/.fhcode/hub/agents/<id>/`.
-
 ```bash
 fhcode agents run "write tests for src/payments" --name tests --allow-tool "Bash(npm test:*)"
-fhcode agents                    # status, cost, turns, last tool of every agent
-fhcode agents logs <id> -f       # follow an agent
+fhcode agents                     # status, FOTOhub cost, turns, last tool
+fhcode agents logs <id> -f
 fhcode agents stop <id>
-fhcode hub                       # web dashboard on 127.0.0.1:7878
+fhcode hub                        # dashboard on 127.0.0.1:7878 (token in the printed URL)
 ```
 
-- **Dashboard.** It starts and stops agents, shows their output and cost, and shows the wallet and saved sessions. It listens only on 127.0.0.1 and needs the token in the URL it prints.
-- **Hub tools in sessions.** The agent in an interactive session can start background agents and check on them with the `hub_*` tools. A background agent can watch the hub but cannot start more agents.
-- **Default mode.** Background agents start in `accept-edits` mode, so commands are refused unless `--allow-tool` permits them.
+- **What a background agent is.** Each one is a headless FH Code run, Claude Code on the FOTOhub API, in its own process. Its events go to `~/.fhcode/hub/agents/<id>/`.
+- **Default mode.** Agents start in `accept-edits` mode, so commands are refused unless `--allow-tool` permits them.
+- **The `fh-code` MCP tools.** The agent in a session can start and watch hub agents itself. A hub agent can watch the hub but cannot start more agents.
 
-## MCP integrations
+## Account limits and costs
 
-FOTOhub's MCP server (`https://apis.fotohub.app/mcp/`) connects automatically with your key. It gives the agent FOTOhub's generation, editing, storage, pricing and wallet tools. To turn it off for one run, pass `--no-mcp`. To turn it off for good, set `"fotohubMcp": false` in settings.
+By default the limits come from the FOTOhub API (`GET /v1/billing/balance`, `GET /v1/tiers/current`).
 
-Add other servers:
-
-```bash
-fhcode mcp add github https://api.example.com/mcp --header "Authorization: Bearer ..."
-fhcode mcp add files -- npx -y @modelcontextprotocol/server-filesystem ./docs
-fhcode mcp add shop --project https://...     # into this project's .mcp.json
-fhcode mcp                                     # connect and show every server's status
-```
-
-Servers are read from `~/.fhcode/mcp.json`, the project's `.mcp.json`, `mcpServers` in settings, and plugins. Each file uses the standard `{"mcpServers": {...}}` format.
-
-## Plugins
-
-```bash
-fhcode plugin install feature-dev            # from fh-code-plugins (this repository), added automatically
-fhcode plugin install my-plugin@my-market
-fhcode plugin marketplace add owner/repo     # or a git URL or a local directory
-fhcode plugin marketplace update
-fhcode plugin                                # installed plugins
-fhcode plugin remove feature-dev
-```
-
-A plugin can contain:
-
-- a manifest at `.fhcode-plugin/plugin.json` (`.claude-plugin/plugin.json` is also read),
-- `commands/*.md`,
-- `agents/*.md`,
-- `skills/<name>/SKILL.md`,
-- `hooks/hooks.json`,
-- `.mcp.json`.
-
-Plugins load from `~/.fhcode/plugins/` and `.fhcode/plugins/`, from `plugins` in settings, and from `--plugin-dir`.
-
-## Hooks
-
-Hooks are shell commands that run on agent events:
-
-- `PreToolUse`
-- `PostToolUse`
-- `UserPromptSubmit`
-- `Stop`
-- `SubagentStop`
-- `SessionStart`
-- `SessionEnd`
-
-They come from settings and plugins and use the Claude Code hook protocol:
-
-- **Input.** The event arrives as JSON on stdin.
-- **Exit code 2** blocks the action, and stderr goes to the model.
-- **JSON on stdout** can carry `decision`, `reason`, `hookSpecificOutput.permissionDecision` and `additionalContext`.
-
-The command gets `FHCODE_PLUGIN_ROOT`/`CLAUDE_PLUGIN_ROOT` and `FHCODE_PROJECT_DIR`/`CLAUDE_PROJECT_DIR`. Hooks marked `asyncRewake` are skipped.
-
-## Settings
-
-Settings files are merged in this order:
-
-1. `~/.fhcode/settings.json`
-2. `.fhcode/settings.json`
-3. `.fhcode/settings.local.json`
-
-```json
-{
-  "permissions": { "allow": ["Bash(npm test:*)"], "deny": ["Bash(rm -rf:*)"] },
-  "hooks": { "PostToolUse": [{ "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "npx prettier --write \"$(jq -r .tool_input.file_path)\"" }] }] },
-  "mcpServers": {},
-  "plugins": ["../shared-plugins"],
-  "fotohubMcp": true
-}
-```
-
-Project instructions come from `FHCODE.md`, `AGENTS.md` or `CLAUDE.md` at the workspace root, and from `~/.fhcode/FHCODE.md` for every project.
-
-## Costs and account limits
-
-- **Before every turn**, FH Code checks the account. This includes turns of subagents and background agents. It stops with a top-up link when:
-  - the wallet is empty,
-  - the monthly spending limit is reached, or
-  - the session budget (`--max-budget-usd`) is used up.
-- **After every turn**, it records what the turn cost.
-- **Where the limits come from:**
-  - **FOTOhub API (default).** `GET /v1/billing/balance` and `GET /v1/tiers/current`.
-  - **A fotohub.app account endpoint.** Set `FHCODE_ACCOUNT_LIMITS_URL` (or `accountLimitsUrl` in `~/.fhcode/config.json`) to a URL that returns `{"balanceUsd", "monthlyLimitUsd", "spentThisMonthUsd", "tier", "rpm"}`.
-  - **A provider in code.** Pass your own `accountProvider` when embedding.
+To use account limits served by fotohub.app instead, set `FHCODE_ACCOUNT_LIMITS_URL` (or `accountLimitsUrl` in `~/.fhcode/config.json`). It must point to an endpoint that returns `{"balanceUsd", "monthlyLimitUsd", "spentThisMonthUsd", "tier", "rpm"}`. FH Code calls it with the user's key.
 
 ## Configuration
 
-| Setting | Flag | Environment | Default |
-|---------|------|-------------|---------|
-| API key | `--api-key` | `FOTOHUB_API_KEY` | saved key |
-| API base URL | `--base-url` | `FOTOHUB_BASE_URL` | `https://apis.fotohub.app` |
-| Model | `--model` | `FHCODE_MODEL` | `claude-sonnet-4.6` |
-| Permission mode | `--mode` | `FHCODE_MODE` | `default` |
-| Session budget (USD) | `--max-budget-usd` | `FHCODE_MAX_BUDGET_USD` | none |
-| FH Code home | | `FHCODE_CONFIG_DIR` | `~/.fhcode` |
-| Docs source | | `FHCODE_DOCS_SOURCE` | markdown source of docs.fotohub.app |
-| Account limits endpoint | | `FHCODE_ACCOUNT_LIMITS_URL` | FOTOhub API |
-| Update channel | | `FHCODE_UPDATE_URL` | GitHub releases of fotohubapp/Fh-code |
-| Disable the daily update check | | `FHCODE_NO_UPDATE_CHECK=1` | |
+| Setting | Environment | Default |
+|---------|-------------|---------|
+| API key | `FOTOHUB_API_KEY` | key saved by `fhcode login` |
+| API base URL | `FOTOHUB_BASE_URL` | `https://apis.fotohub.app` |
+| Default FOTOhub model | `FHCODE_MODEL` | `claude-sonnet-4.6` |
+| Session budget (USD) | `FHCODE_MAX_BUDGET_USD` | none |
+| Engine binary | `FHCODE_ENGINE_BIN` | `claude` on PATH |
+| FH Code home | `FHCODE_CONFIG_DIR` | `~/.fhcode` |
+| Account limits endpoint | `FHCODE_ACCOUNT_LIMITS_URL` | FOTOhub API |
+| Docs source | `FHCODE_DOCS_SOURCE` | markdown source of docs.fotohub.app |
+| Update channel | `FHCODE_UPDATE_URL` | GitHub releases of fotohubapp/Fh-code |
+| Disable the daily update check | `FHCODE_NO_UPDATE_CHECK=1` | |
 
 ## Updates
 
-`fhcode update` installs the newest release, and `fhcode update --check` only reports it. Interactive sessions check once a day.
+`fhcode update` installs the newest FH Code release.
 
 The update channel can point at either:
 
 - **GitHub (default):** the latest release of this repository.
-- **A JSON manifest:** `{"version", "tarball", "notes"}`, so FOTOhub can serve updates from fotohub.app.
+- **A JSON manifest:** `{"version", "tarball", "notes"}` served by FOTOhub.
 
 To publish a release:
 
@@ -253,47 +152,45 @@ The [release workflow](../.github/workflows/fhcode-release.yml) then:
 
 1. refreshes the docs index from [fotohubapp/docs](https://github.com/fotohubapp/docs),
 2. runs the tests, and
-3. publishes `fh-code-<version>.tgz` and `fh-code.tgz`.
+3. publishes the tarball.
+
+The engine updates itself through Anthropic's own channel.
+
+## IDE extensions
+
+Run `fhcode gateway` and start the IDE with the two variables it prints (`ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`). The Claude Code extension then runs on the FOTOhub API too.
+
+## FH Code lite
+
+`fhcode lite` is FH Code's own agent, written from scratch. It needs no engine and is also the library the hub falls back to. It has:
+
+- a simple line interface,
+- the same tools as the engine (`Read`, `Write`, `Edit`, `Glob`, `Grep`, `Bash`, `WebFetch`, `Task`, `Skill`),
+- subagents that run in parallel,
+- FOTOhub and other MCP servers,
+- plugins, hooks and permission rules in the Claude Code formats,
+- sessions, and the same account limits.
+
+Run `fhcode lite --help` for its options.
 
 ## Embedding in FOTOhub apps
 
 ```ts
-import { FotohubCodeAgent, HttpAccountProvider } from "fh-code";
+import { FotohubCodeAgent, startGateway } from "fh-code";
 
-const agent = new FotohubCodeAgent({
-  apiKey: user.fotohubApiKey,
-  model: "claude-sonnet-4.6",
-  cwd: projectRoot,
-  approver: async ({ tool, summary, agent }) => ((await ui.confirm(`${agent ?? "FH Code"} · ${tool}: ${summary}`)) ? "once" : "deny"),
-  accountProvider: new HttpAccountProvider("https://fotohub.app/api/fhcode/limits", user.sessionToken),
-  maxBudgetUsd: 5,
-});
+// Option 1: FH Code's own agent, events in your UI
+const agent = new FotohubCodeAgent({ apiKey, model: "claude-sonnet-4.6", cwd, approver: askInYourUi });
+for await (const e of agent.send("Add a /health endpoint")) render(e);
 
-for await (const event of agent.send("Add a /health endpoint")) {
-  switch (event.type) {
-    case "text_delta":     if (!event.agent) ui.appendText(event.text); break;
-    case "tool_call":      ui.showTool(event.agent, event.name, event.input); break;
-    case "tool_result":    ui.showToolResult(event.id, event.content, event.isError); break;
-    case "subagent_start": ui.showSubagent(event.agent, event.agentType, event.description); break;
-    case "usage":          ui.showCost(event.chargedUsd, event.sessionUsd); break;
-    case "notice":         ui.notice(event.text); break;
-    case "result":         ui.done(event.text); break;
-  }
-}
-await agent.close();
+// Option 2: the gateway, for anything that speaks the Anthropic Messages API (e.g. the Claude Agent SDK)
+const gw = await startGateway({ apiKey });
+// ANTHROPIC_BASE_URL=gw.url, ANTHROPIC_AUTH_TOKEN=gw.token
 ```
-
-The library also exports:
-
-- the hub: `startHubAgent`, `listHubAgents` and `startHubServer`,
-- MCP: `McpManager` and `McpClient`,
-- extensions: `loadExtensions`, `installPlugin` and `renderCommand`,
-- sessions: `listSessions` and `loadSession`.
 
 ## Develop
 
 ```bash
 npm ci
-npm test       # typecheck, build, and 25 tests against a mock FOTOhub API, including MCP, subagents, hooks, the repo's plugins and the hub
+npm test    # 29 tests against a mock FOTOhub API, including an end-to-end run of the real engine when `claude` is installed
 node scripts/build-docs-index.mjs <fotohubapp/docs checkout>
 ```

@@ -31,13 +31,18 @@ export async function startMockApi({ turns = [], respond, balance = 10, monthlyL
 
     if (req.url === "/mcp/") {
       if (!mcp) return sendJson(404, { error: "not here" });
-      if (!json.id) {
+      // Streamable HTTP: this server offers no standalone GET stream.
+      if (req.method !== "POST") {
+        res.writeHead(405);
+        return res.end();
+      }
+      if (json.id === undefined) {
         res.writeHead(202);
         return res.end();
       }
       mcpCalls.push(json);
       if (json.method === "initialize") {
-        return sendJson(200, { jsonrpc: "2.0", id: json.id, result: { protocolVersion: "2025-03-26", serverInfo: { name: "fotohub" }, capabilities: { tools: {} } } });
+        return sendJson(200, { jsonrpc: "2.0", id: json.id, result: { protocolVersion: "2025-03-26", serverInfo: { name: "fotohub", version: "1.0.0" }, capabilities: { tools: {} } } });
       }
       if (json.method === "tools/list") {
         return sendJson(200, {

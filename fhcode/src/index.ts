@@ -1,5 +1,7 @@
 /**
- * FH Code (FOTOhub Code) as a library, for embedding the agent in FOTOhub apps.
+ * FH Code (FOTOhub Code) as a library, for embedding in FOTOhub apps: the
+ * built-in agent, the Anthropic-compatible FOTOhub gateway, the engine
+ * launcher, the agent hub, MCP and plugins.
  *
  *   import { FotohubCodeAgent } from "fh-code";
  *
@@ -29,6 +31,9 @@ export { McpManager, fotohubMcpConfig, type McpServerConfig } from "./mcp/manage
 export { McpClient, HttpTransport, StdioTransport } from "./mcp/client.js";
 export { startHubAgent, listHubAgents, getHubAgent, stopHubAgent, type HubAgentState } from "./hub/store.js";
 export { startHubServer } from "./hub/server.js";
+export { startGateway, type Gateway, type GatewayOptions } from "./gateway/server.js";
+export { toFotohubRequest, toFotohubModel, ENGINE_MODELS } from "./gateway/translate.js";
+export { findEngine, launchEngine, prepareEngineHome, ENGINE_HOME } from "./engine/launch.js";
 export { listSessions, loadSession, Transcript } from "./sessions.js";
 export {
   AccountGuard,

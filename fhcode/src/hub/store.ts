@@ -18,6 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG_DIR } from "../config.js";
 import type { PermissionMode } from "../agent/permissions.js";
+import { findEngine } from "../engine/launch.js";
 
 export const HUB_DIR = path.join(CONFIG_DIR, "hub", "agents");
 const BIN = fileURLToPath(new URL("../../bin/fhcode.js", import.meta.url));
@@ -35,6 +36,8 @@ export interface HubAgentMeta {
   stoppedAt?: string;
   /** The hub agent that started this one, if any. */
   parent?: string;
+  /** "engine" (Claude Code on the FOTOhub API) or "lite" (the built-in agent). */
+  engine?: "engine" | "lite";
 }
 
 export type HubAgentStatus = "running" | "done" | "failed" | "stopped" | "exited";
@@ -58,7 +61,11 @@ export interface StartOptions {
   allowTools?: string[];
   maxBudgetUsd?: number;
   parent?: string;
+  /** Which agent runs it; defaults to the engine when it is installed. */
+  engine?: "engine" | "lite";
 }
+
+const ENGINE_MODES: Record<PermissionMode, string> = { plan: "plan", default: "default", "accept-edits": "acceptEdits", yolo: "bypassPermissions" };
 
 export function startHubAgent(options: StartOptions): HubAgentMeta {
   const id = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${randomBytes(3).toString("hex")}`;
@@ -74,11 +81,22 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
     allowTools: options.allowTools ?? [],
     startedAt: new Date().toISOString(),
     parent: options.parent,
+    engine: options.engine ?? (findEngine() ? "engine" : "lite"),
   };
-  const args = [BIN, "-p", options.prompt, "--output-format", "stream-json", "--mode", meta.mode, "--cwd", meta.cwd];
-  if (options.model) args.push("--model", options.model);
-  if (options.maxBudgetUsd) args.push("--max-budget-usd", String(options.maxBudgetUsd));
-  for (const t of meta.allowTools) args.push("--allow-tool", t);
+  let args: string[];
+  if (meta.engine === "engine") {
+    // Claude Code's -p takes the prompt as its positional argument; the
+    // variadic --allowedTools goes last so it cannot swallow it.
+    args = [BIN, "-p", options.prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", ENGINE_MODES[meta.mode]];
+    if (meta.mode === "yolo") args.push("--dangerously-skip-permissions");
+    if (options.model) args.push("--model", options.model);
+    if (meta.allowTools.length) args.push("--allowedTools", ...meta.allowTools);
+  } else {
+    args = [BIN, "lite", "-p", options.prompt, "--output-format", "stream-json", "--mode", meta.mode, "--cwd", meta.cwd];
+    if (options.model) args.push("--model", options.model);
+    if (options.maxBudgetUsd) args.push("--max-budget-usd", String(options.maxBudgetUsd));
+    for (const t of meta.allowTools) args.push("--allow-tool", t);
+  }
 
   const out = openSync(path.join(dir, "events.jsonl"), "a", 0o600);
   const err = openSync(path.join(dir, "stderr.log"), "a", 0o600);
@@ -86,7 +104,12 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
     cwd: meta.cwd,
     detached: true,
     stdio: ["ignore", out, err],
-    env: { ...process.env, FHCODE_HUB_AGENT_ID: id, FHCODE_NO_UPDATE_CHECK: "1" },
+    env: {
+      ...process.env,
+      FHCODE_HUB_AGENT_ID: id,
+      FHCODE_NO_UPDATE_CHECK: "1",
+      ...(options.maxBudgetUsd ? { FHCODE_MAX_BUDGET_USD: String(options.maxBudgetUsd) } : {}),
+    },
   });
   closeSync(out);
   closeSync(err);
@@ -121,24 +144,59 @@ export function getHubAgent(id: string): HubAgentState {
   const state: HubAgentState = { ...meta, status: "running", costUsd: 0, turns: 0, toolCalls: 0, output: "" };
   let text = "";
   let finished: "done" | "failed" | undefined;
-  const events = readEvents(id);
-  for (const e of events) {
-    if (e.type === "text_delta" && typeof e.text === "string") text += e.text;
-    else if (e.type === "tool_call") {
-      state.toolCalls++;
-      state.lastActivity = `${String(e.name)}`;
-      text += "\n";
-    } else if (e.type === "usage") {
-      state.turns++;
-      if (typeof e.sessionUsd === "number") state.costUsd = e.sessionUsd;
-    } else if (e.type === "result") {
-      finished = "done";
-      if (typeof e.sessionUsd === "number") state.costUsd = e.sessionUsd;
-    } else if (e.type === "error") {
-      finished = "failed";
-      state.error = String(e.message ?? "");
+  let engineResult: string | undefined;
+  for (const e of readEvents(id)) {
+    switch (e.type) {
+      // FH Code lite events
+      case "text_delta":
+        if (typeof e.text === "string" && !e.agent) text += e.text;
+        break;
+      case "tool_call":
+        state.toolCalls++;
+        state.lastActivity = String(e.name);
+        text += "\n";
+        break;
+      case "usage":
+        state.turns++;
+        if (typeof e.sessionUsd === "number") state.costUsd = e.sessionUsd;
+        break;
+      case "error":
+        finished = "failed";
+        state.error = String(e.message ?? "");
+        break;
+      // Claude Code engine events (stream-json)
+      case "assistant": {
+        if (e.parent_tool_use_id) break; // a subagent's turn
+        const content = ((e.message as { content?: Array<Record<string, unknown>> } | undefined)?.content ?? []);
+        for (const block of content) {
+          if (block.type === "text" && typeof block.text === "string") text += block.text + "\n";
+          if (block.type === "tool_use") {
+            state.toolCalls++;
+            state.lastActivity = String(block.name);
+          }
+        }
+        break;
+      }
+      case "result":
+        if (typeof e.sessionUsd === "number") {
+          // lite
+          state.costUsd = e.sessionUsd;
+          finished = "done";
+        } else {
+          finished = e.is_error === true || (typeof e.subtype === "string" && e.subtype !== "success") ? "failed" : "done";
+          if (typeof e.result === "string") engineResult = e.result;
+          if (typeof e.num_turns === "number") state.turns = e.num_turns;
+          if (finished === "failed") state.error = String(e.result ?? e.subtype ?? "failed");
+        }
+        break;
+      // What FOTOhub actually charged, written by FH Code after the engine exits.
+      case "fh_billing":
+        if (typeof e.sessionUsd === "number") state.costUsd = e.sessionUsd;
+        if (typeof e.turns === "number" && !state.turns) state.turns = e.turns;
+        break;
     }
   }
+  if (engineResult !== undefined) text = engineResult;
   state.output = text.trim();
   if (meta.stoppedAt) state.status = "stopped";
   else if (finished) state.status = finished;

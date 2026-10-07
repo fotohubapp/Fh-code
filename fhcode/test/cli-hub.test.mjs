@@ -21,10 +21,10 @@ function run(args, env, input) {
 
 const ws = () => mkdtempSync(path.join(os.tmpdir(), "fhcode-ws-"));
 
-test("headless -p prints a JSON result billed to the wallet", async () => {
+test("lite: headless -p prints a JSON result billed to the wallet", async () => {
   const api = await startMockApi({ turns: [text("Cześć!", 0.0123)] });
   try {
-    const { code, stdout } = await run(["-p", "hej", "--output-format", "json", "--cwd", ws()], { FOTOHUB_API_KEY: KEY, FOTOHUB_BASE_URL: api.baseUrl });
+    const { code, stdout } = await run(["lite", "-p", "hej", "--output-format", "json", "--cwd", ws()], { FOTOHUB_API_KEY: KEY, FOTOHUB_BASE_URL: api.baseUrl });
     assert.equal(code, 0);
     const result = JSON.parse(stdout.trim());
     assert.equal(result.text, "Cześć!");
@@ -35,10 +35,10 @@ test("headless -p prints a JSON result billed to the wallet", async () => {
   }
 });
 
-test("headless run explains an empty wallet and exits non-zero", async () => {
+test("lite: headless run explains an empty wallet and exits non-zero", async () => {
   const api = await startMockApi({ balance: 0 });
   try {
-    const { code, stderr } = await run(["-p", "hej", "--cwd", ws(), "--no-mcp"], { FOTOHUB_API_KEY: KEY, FOTOHUB_BASE_URL: api.baseUrl });
+    const { code, stderr } = await run(["lite", "-p", "hej", "--cwd", ws(), "--no-mcp"], { FOTOHUB_API_KEY: KEY, FOTOHUB_BASE_URL: api.baseUrl });
     assert.equal(code, 1);
     assert.match(stderr, /wallet balance is \$0\.00/);
   } finally {
@@ -46,17 +46,17 @@ test("headless run explains an empty wallet and exits non-zero", async () => {
   }
 });
 
-test("interactive session over piped input: prompt, slash commands, exit", async () => {
+test("lite: interactive session over piped input: prompt, slash commands, exit", async () => {
   const api = await startMockApi({ turns: [toolUse("t1", "mcp__fotohub__check_balance", {}), text("Masz $9.")], balance: 9 });
   try {
-    const { code, stdout } = await run(["--cwd", ws()], { FOTOHUB_API_KEY: KEY, FOTOHUB_BASE_URL: api.baseUrl }, "ile mam?\n/mcp\n/cost\n/exit\n");
+    const { code, stdout } = await run(["lite", "--cwd", ws()], { FOTOHUB_API_KEY: KEY, FOTOHUB_BASE_URL: api.baseUrl }, "ile mam?\n/mcp\n/cost\n/exit\n");
     assert.equal(code, 0);
     assert.match(stdout, /FH Code/);
     assert.match(stdout, /MCP fotohub \(2\)/);
     assert.match(stdout, /● mcp__fotohub__check_balance/);
     assert.match(stdout, /Masz \$9\./);
     assert.match(stdout, /● fotohub .*2 tools/);
-    assert.match(stdout, /Resume: fhcode -r /);
+    assert.match(stdout, /Resume: fhcode lite -r /);
   } finally {
     await api.close();
   }
@@ -68,7 +68,7 @@ test("a background hub agent runs to completion and reports cost and output", as
   process.env.FOTOHUB_API_KEY = KEY;
   process.env.FOTOHUB_BASE_URL = api.baseUrl;
   try {
-    const meta = startHubAgent({ prompt: "do the thing", cwd: ws(), name: "worker" });
+    const meta = startHubAgent({ prompt: "do the thing", cwd: ws(), name: "worker", engine: "lite" });
     let state;
     for (let i = 0; i < 100; i++) {
       state = getHubAgent(meta.id);

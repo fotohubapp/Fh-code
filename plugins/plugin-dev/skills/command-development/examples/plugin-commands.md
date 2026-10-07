@@ -1,6 +1,6 @@
 # Plugin Command Examples
 
-Practical examples of commands designed for Claude Code plugins, demonstrating plugin-specific patterns and features.
+Practical examples of commands designed for FOTOhub Code plugins, demonstrating plugin-specific patterns and features.
 
 ## Table of Contents
 

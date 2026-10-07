@@ -1,10 +1,10 @@
-# Claude Code Plugins
+# FOTOhub Code Plugins
 
-This directory contains some official Claude Code plugins that extend functionality through custom commands, agents, and workflows. These are examples of what's possible with the Claude Code plugin system—many more plugins are available through community marketplaces.
+This directory contains the FOTOhub Code plugins that extend functionality through custom commands, agents, and workflows. These are examples of what's possible with the FOTOhub Code plugin system—many more plugins are available through community marketplaces.
 
-## What are Claude Code Plugins?
+## What are FOTOhub Code Plugins?
 
-Claude Code plugins are extensions that enhance Claude Code with custom slash commands, specialized agents, hooks, and MCP servers. Plugins can be shared across projects and teams, providing consistent tooling and workflows.
+FOTOhub Code plugins are extensions that enhance FOTOhub Code with custom slash commands, specialized agents, hooks, and MCP servers. Plugins can be shared across projects and teams, providing consistent tooling and workflows.
 
 Learn more in the [official plugins documentation](https://docs.claude.com/en/docs/claude-code/plugins).
 
@@ -21,21 +21,21 @@ Learn more in the [official plugins documentation](https://docs.claude.com/en/do
 | [frontend-design](./frontend-design/) | Create distinctive, production-grade frontend interfaces that avoid generic AI aesthetics | **Skill:** `frontend-design` - Auto-invoked for frontend work, providing guidance on bold design choices, typography, animations, and visual details |
 | [hookify](./hookify/) | Easily create custom hooks to prevent unwanted behaviors by analyzing conversation patterns or explicit instructions | **Commands:** `/hookify`, `/hookify:list`, `/hookify:configure`, `/hookify:help`<br>**Agent:** `conversation-analyzer` - Analyzes conversations for problematic behaviors<br>**Skill:** `writing-rules` - Guidance on hookify rule syntax |
 | [learning-output-style](./learning-output-style/) | Interactive learning mode that requests meaningful code contributions at decision points (mimics the unshipped Learning output style) | **Hook:** SessionStart - Encourages users to write meaningful code (5-10 lines) at decision points while receiving educational insights |
-| [plugin-dev](./plugin-dev/) | Comprehensive toolkit for developing Claude Code plugins with 7 expert skills and AI-assisted creation | **Command:** `/plugin-dev:create-plugin` - 8-phase guided workflow for building plugins<br>**Agents:** `agent-creator`, `plugin-validator`, `skill-reviewer`<br>**Skills:** Hook development, MCP integration, plugin structure, settings, commands, agents, and skill development |
+| [plugin-dev](./plugin-dev/) | Comprehensive toolkit for developing FOTOhub Code plugins with 7 expert skills and AI-assisted creation | **Command:** `/plugin-dev:create-plugin` - 8-phase guided workflow for building plugins<br>**Agents:** `agent-creator`, `plugin-validator`, `skill-reviewer`<br>**Skills:** Hook development, MCP integration, plugin structure, settings, commands, agents, and skill development |
 | [pr-review-toolkit](./pr-review-toolkit/) | Comprehensive PR review agents specializing in comments, tests, error handling, type design, code quality, and code simplification | **Command:** `/pr-review-toolkit:review-pr` - Run with optional review aspects (comments, tests, errors, types, code, simplify, all)<br>**Agents:** `comment-analyzer`, `pr-test-analyzer`, `silent-failure-hunter`, `type-design-analyzer`, `code-reviewer`, `code-simplifier` |
 | [ralph-wiggum](./ralph-wiggum/) | Interactive self-referential AI loops for iterative development. Claude works on the same task repeatedly until completion | **Commands:** `/ralph-loop`, `/cancel-ralph` - Start/stop autonomous iteration loops<br>**Hook:** Stop - Intercepts exit attempts to continue iteration |
 | [security-guidance](./security-guidance/) | Security reminder hook that warns about potential security issues when editing files | **Hook:** PreToolUse - Monitors 9 security patterns including command injection, XSS, eval usage, dangerous HTML, pickle deserialization, and os.system calls |
 
 ## Installation
 
-These plugins are included in the Claude Code repository. To use them in your own projects:
+These plugins are included in the FOTOhub Code repository. To use them in your own projects:
 
-1. Install Claude Code globally:
+1. Install FOTOhub Code globally:
 ```bash
 npm install -g @anthropic-ai/claude-code
 ```
 
-2. Navigate to your project and run Claude Code:
+2. Navigate to your project and run FOTOhub Code:
 ```bash
 claude
 ```
@@ -46,7 +46,7 @@ For detailed plugin installation and configuration, see the [official documentat
 
 ## Plugin Structure
 
-Each plugin follows the standard Claude Code plugin structure:
+Each plugin follows the standard FOTOhub Code plugin structure:
 
 ```
 plugin-name/
@@ -72,6 +72,6 @@ When adding new plugins to this directory:
 
 ## Learn More
 
-- [Claude Code Documentation](https://docs.claude.com/en/docs/claude-code/overview)
+- [Claude Code engine documentation](https://docs.claude.com/en/docs/claude-code/overview)
 - [Plugin System Documentation](https://docs.claude.com/en/docs/claude-code/plugins)
 - [Agent SDK Documentation](https://docs.claude.com/en/api/agent-sdk/overview)

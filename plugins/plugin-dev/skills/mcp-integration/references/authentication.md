@@ -1,6 +1,6 @@
 # MCP Authentication Patterns
 
-Complete guide to authentication methods for MCP servers in Claude Code plugins.
+Complete guide to authentication methods for MCP servers in FOTOhub Code plugins.
 
 ## Overview
 
@@ -10,13 +10,13 @@ MCP servers support multiple authentication methods depending on the server type
 
 ### How It Works
 
-Claude Code automatically handles the complete OAuth 2.0 flow for SSE and HTTP servers:
+FOTOhub Code automatically handles the complete OAuth 2.0 flow for SSE and HTTP servers:
 
 1. User attempts to use MCP tool
-2. Claude Code detects authentication needed
+2. FOTOhub Code detects authentication needed
 3. Opens browser for OAuth consent
 4. User authorizes in browser
-5. Tokens stored securely by Claude Code
+5. Tokens stored securely by FOTOhub Code
 6. Automatic token refresh
 
 ### Configuration
@@ -30,7 +30,7 @@ Claude Code automatically handles the complete OAuth 2.0 flow for SSE and HTTP s
 }
 ```
 
-No additional auth configuration needed! Claude Code handles everything.
+No additional auth configuration needed! FOTOhub Code handles everything.
 
 ### Supported Services
 
@@ -56,7 +56,7 @@ This plugin requires the following Asana permissions:
 
 ### Token Storage
 
-Tokens are stored securely by Claude Code:
+Tokens are stored securely by FOTOhub Code:
 - Not accessible to plugins
 - Encrypted at rest
 - Automatic refresh
@@ -74,7 +74,7 @@ Tokens are stored securely by Claude Code:
 - Check server documentation for required scopes
 
 **Token expiration:**
-- Claude Code auto-refreshes
+- FOTOhub Code auto-refreshes
 - If refresh fails, prompts re-authentication
 
 ## Token-Based Authentication

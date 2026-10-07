@@ -6,24 +6,24 @@ Advanced patterns for organizing plugin components effectively.
 
 ### Discovery Phase
 
-When Claude Code starts:
+When FOTOhub Code starts:
 
 1. **Scan enabled plugins**: Read `.claude-plugin/plugin.json` for each
 2. **Discover components**: Look in default and custom paths
 3. **Parse definitions**: Read YAML frontmatter and configurations
-4. **Register components**: Make available to Claude Code
+4. **Register components**: Make available to FOTOhub Code
 5. **Initialize**: Start MCP servers, register hooks
 
-**Timing**: Component registration happens during Claude Code initialization, not continuously.
+**Timing**: Component registration happens during FOTOhub Code initialization, not continuously.
 
 ### Activation Phase
 
 When components are used:
 
-**Commands**: User types slash command → Claude Code looks up → Executes
-**Agents**: Task arrives → Claude Code evaluates capabilities → Selects agent
-**Skills**: Task context matches description → Claude Code loads skill
-**Hooks**: Event occurs → Claude Code calls matching hooks
+**Commands**: User types slash command → FOTOhub Code looks up → Executes
+**Agents**: Task arrives → FOTOhub Code evaluates capabilities → Selects agent
+**Skills**: Task context matches description → FOTOhub Code loads skill
+**Hooks**: Event occurs → FOTOhub Code calls matching hooks
 **MCP Servers**: Tool call matches server capability → Forwards to server
 
 ## Command Organization Patterns
@@ -108,7 +108,7 @@ commands/
     └── status.md
 ```
 
-**Note**: Claude Code doesn't support nested command discovery automatically. Use custom paths:
+**Note**: FOTOhub Code doesn't support nested command discovery automatically. Use custom paths:
 
 ```json
 {
@@ -345,7 +345,7 @@ hooks/
 }
 ```
 
-**Note**: Use build script to combine files, Claude Code doesn't support file references.
+**Note**: Use build script to combine files, FOTOhub Code doesn't support file references.
 
 **When to use**:
 - 10+ hooks

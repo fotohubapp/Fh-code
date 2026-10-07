@@ -32,7 +32,7 @@ Use the Task tool to launch conversation-analyzer agent:
 {
   "subagent_type": "general-purpose",
   "description": "Analyze conversation for unwanted behaviors",
-  "prompt": "You are analyzing a Claude Code conversation to find behaviors the user wants to prevent.
+  "prompt": "You are analyzing a FOTOhub Code conversation to find behaviors the user wants to prevent.
 
 Read user messages in the current conversation and identify:
 1. Explicit requests to avoid something (\"don't do X\", \"stop doing Y\")
@@ -127,7 +127,7 @@ conditions:
 
 **IMPORTANT**: Rule files must be created in the current working directory's `.claude/` folder, NOT the plugin directory.
 
-Use the current working directory (where Claude Code was started) as the base path.
+Use the current working directory (where FOTOhub Code was started) as the base path.
 
 1. Check if `.claude/` directory exists in current working directory
    - If not, create it first with: `mkdir -p .claude`

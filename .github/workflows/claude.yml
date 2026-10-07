@@ -1,4 +1,4 @@
-name: Claude Code
+name: FOTOhub Code
 
 on:
   issue_comment:
@@ -31,7 +31,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Run Claude Code
+      - name: Run FOTOhub Code
         id: claude
         uses: anthropics/claude-code-action@v1
         with:

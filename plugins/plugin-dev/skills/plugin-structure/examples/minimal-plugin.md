@@ -63,7 +63,7 @@ Executed at: 2025-01-15 14:30:22 UTC
 
 1. **Minimal manifest**: Only the required `name` field
 2. **Single command**: One markdown file in `commands/` directory
-3. **Auto-discovery**: Claude Code finds the command automatically
+3. **Auto-discovery**: FOTOhub Code finds the command automatically
 4. **No dependencies**: No scripts, hooks, or external resources
 
 ## When to Use This Pattern

@@ -28,7 +28,7 @@ cd my-plugin
 
 ## test-hook.sh
 
-Tests individual hook scripts with sample input before deploying to Claude Code.
+Tests individual hook scripts with sample input before deploying to FOTOhub Code.
 
 **Usage:**
 ```bash
@@ -122,7 +122,7 @@ Checks hook scripts for common issues and best practices violations.
    ./validate-hook-schema.sh my-plugin/hooks/hooks.json
    ```
 
-7. **Test in Claude Code**
+7. **Test in FOTOhub Code**
    ```bash
    claude --debug
    ```

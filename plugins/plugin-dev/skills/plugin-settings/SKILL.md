@@ -4,7 +4,7 @@ description: This skill should be used when the user asks about "plugin settings
 version: 0.1.0
 ---
 
-# Plugin Settings Pattern for Claude Code Plugins
+# Plugin Settings Pattern for FOTOhub Code Plugins
 
 ## Overview
 
@@ -283,7 +283,7 @@ Steps:
 2. Create `.claude/my-plugin.local.md` with YAML frontmatter
 3. Set appropriate values based on user input
 4. Inform user that settings are saved
-5. Remind user to restart Claude Code for hooks to recognize changes
+5. Remind user to restart FOTOhub Code for hooks to recognize changes
 ```
 
 ### Template Generation
@@ -307,7 +307,7 @@ max_retries: 3
 Your settings are active.
 \`\`\`
 
-After creating or editing, restart Claude Code for changes to take effect.
+After creating or editing, restart FOTOhub Code for changes to take effect.
 ```
 
 ## Best Practices
@@ -366,7 +366,7 @@ fi
 
 ### Restart Requirement
 
-**Important:** Settings changes require Claude Code restart.
+**Important:** Settings changes require FOTOhub Code restart.
 
 Document in your README:
 
@@ -375,7 +375,7 @@ Document in your README:
 
 After editing `.claude/my-plugin.local.md`:
 1. Save the file
-2. Exit Claude Code
+2. Exit FOTOhub Code
 3. Restart: `claude` or `cc`
 4. New settings will be loaded
 ```
@@ -539,6 +539,6 @@ To add settings to a plugin:
 4. Implement settings parsing in hooks/commands
 5. Use quick-exit pattern (check file exists, check enabled field)
 6. Document settings in plugin README with template
-7. Remind users that changes require Claude Code restart
+7. Remind users that changes require FOTOhub Code restart
 
 Focus on keeping settings simple and providing good defaults when settings file doesn't exist.

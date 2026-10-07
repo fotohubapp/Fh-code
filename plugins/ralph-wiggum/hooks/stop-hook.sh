@@ -60,7 +60,7 @@ TRANSCRIPT_PATH=$(echo "$HOOK_INPUT" | jq -r '.transcript_path')
 if [[ ! -f "$TRANSCRIPT_PATH" ]]; then
   echo "⚠️  Ralph loop: Transcript file not found" >&2
   echo "   Expected: $TRANSCRIPT_PATH" >&2
-  echo "   This is unusual and may indicate a Claude Code internal issue." >&2
+  echo "   This is unusual and may indicate a FOTOhub Code internal issue." >&2
   echo "   Ralph loop is stopping." >&2
   rm "$RALPH_STATE_FILE"
   exit 0

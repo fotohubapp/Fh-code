@@ -1,6 +1,6 @@
 # Plugin-Specific Command Features Reference
 
-This reference covers features and patterns specific to commands bundled in Claude Code plugins.
+This reference covers features and patterns specific to commands bundled in FOTOhub Code plugins.
 
 ## Table of Contents
 
@@ -14,7 +14,7 @@ This reference covers features and patterns specific to commands bundled in Clau
 
 ### Auto-Discovery
 
-Claude Code automatically discovers commands in plugins using the following locations:
+FOTOhub Code automatically discovers commands in plugins using the following locations:
 
 ```
 plugin-name/

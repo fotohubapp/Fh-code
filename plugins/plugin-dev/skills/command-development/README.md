@@ -1,6 +1,6 @@
 # Command Development Skill
 
-Comprehensive guidance on creating Claude Code slash commands, including file format, frontmatter options, dynamic arguments, and best practices.
+Comprehensive guidance on creating FOTOhub Code slash commands, including file format, frontmatter options, dynamic arguments, and best practices.
 
 ## Overview
 
@@ -81,7 +81,7 @@ Practical command examples:
 
 ## When This Skill Triggers
 
-Claude Code activates this skill when users:
+FOTOhub Code activates this skill when users:
 - Ask to "create a slash command" or "add a command"
 - Need to "write a custom command"
 - Want to "define command arguments"
@@ -261,7 +261,7 @@ To update this skill:
 3. Add new examples/ for different use cases
 4. Update frontmatter when new fields added
 5. Ensure imperative/infinitive form throughout
-6. Test examples work with current Claude Code
+6. Test examples work with current FOTOhub Code
 
 ## Version History
 

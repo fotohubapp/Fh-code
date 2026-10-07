@@ -152,8 +152,8 @@ Users can edit settings files manually:
 vim .claude/my-plugin.local.md
 
 # Changes take effect after restart
-exit  # Exit Claude Code
+exit  # Exit FOTOhub Code
 claude  # Restart
 ```
 
-Changes require Claude Code restart - hooks can't be hot-swapped.
+Changes require FOTOhub Code restart - hooks can't be hot-swapped.

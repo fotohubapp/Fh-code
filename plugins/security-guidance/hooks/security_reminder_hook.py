@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Security Guidance Plugin for Claude Code
+Security Guidance Plugin for FOTOhub Code
 
 A hooks-based plugin that guides Claude toward writing more secure code. It runs as
-UserPromptSubmit, PostToolUse, and Stop hooks via the Claude Code plugin system.
+UserPromptSubmit, PostToolUse, and Stop hooks via the FOTOhub Code plugin system.
 
 ## Architecture
 

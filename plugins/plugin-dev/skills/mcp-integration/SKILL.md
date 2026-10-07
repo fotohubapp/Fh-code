@@ -1,14 +1,14 @@
 ---
 name: MCP Integration
-description: This skill should be used when the user asks to "add MCP server", "integrate MCP", "configure MCP in plugin", "use .mcp.json", "set up Model Context Protocol", "connect external service", mentions "${CLAUDE_PLUGIN_ROOT} with MCP", or discusses MCP server types (SSE, stdio, HTTP, WebSocket). Provides comprehensive guidance for integrating Model Context Protocol servers into Claude Code plugins for external tool and service integration.
+description: This skill should be used when the user asks to "add MCP server", "integrate MCP", "configure MCP in plugin", "use .mcp.json", "set up Model Context Protocol", "connect external service", mentions "${CLAUDE_PLUGIN_ROOT} with MCP", or discusses MCP server types (SSE, stdio, HTTP, WebSocket). Provides comprehensive guidance for integrating Model Context Protocol servers into FOTOhub Code plugins for external tool and service integration.
 version: 0.1.0
 ---
 
-# MCP Integration for Claude Code Plugins
+# MCP Integration for FOTOhub Code Plugins
 
 ## Overview
 
-Model Context Protocol (MCP) enables Claude Code plugins to integrate with external services and APIs by providing structured tool access. Use MCP integration to expose external service capabilities as tools within Claude Code.
+Model Context Protocol (MCP) enables FOTOhub Code plugins to integrate with external services and APIs by providing structured tool access. Use MCP integration to expose external service capabilities as tools within FOTOhub Code.
 
 **Key capabilities:**
 - Connect to external services (databases, APIs, file systems)
@@ -88,9 +88,9 @@ Execute local MCP servers as child processes. Best for local tools and custom se
 - NPM-packaged MCP servers
 
 **Process management:**
-- Claude Code spawns and manages the process
+- FOTOhub Code spawns and manages the process
 - Communicates via stdin/stdout
-- Terminates when Claude Code exits
+- Terminates when FOTOhub Code exits
 
 ### SSE (Server-Sent Events)
 
@@ -115,7 +115,7 @@ Connect to hosted MCP servers with OAuth support. Best for cloud services.
 **Authentication:**
 - OAuth flows handled automatically
 - User prompted on first use
-- Tokens managed by Claude Code
+- Tokens managed by FOTOhub Code
 
 ### HTTP (REST API)
 
@@ -242,7 +242,7 @@ Use `/mcp` command to see all servers including plugin-provided ones.
 
 ### OAuth (SSE/HTTP)
 
-OAuth handled automatically by Claude Code:
+OAuth handled automatically by FOTOhub Code:
 
 ```json
 {
@@ -466,7 +466,7 @@ Look for:
 - Verify server connected successfully
 - Check tool names match exactly
 - Run `/mcp` to see available tools
-- Restart Claude Code after config changes
+- Restart FOTOhub Code after config changes
 
 **Authentication failing:**
 - Clear cached auth tokens
@@ -533,7 +533,7 @@ Working examples in `examples/`:
 ### External Resources
 
 - **Official MCP Docs**: https://modelcontextprotocol.io/
-- **Claude Code MCP Docs**: https://docs.claude.com/en/docs/claude-code/mcp
+- **Claude Code engine MCP docs**: https://docs.claude.com/en/docs/claude-code/mcp
 - **MCP SDK**: @modelcontextprotocol/sdk
 - **Testing**: Use `claude --debug` and `/mcp` command
 

@@ -1,72 +1,65 @@
-# Claude Code
+# FH Code (FOTOhub Code)
 
-![](https://img.shields.io/badge/Node.js-18%2B-brightgreen?style=flat-square) [![npm]](https://www.npmjs.com/package/@anthropic-ai/claude-code)
+![FH Code: the FOTOhub API hero at the top of the terminal](./docs/images/fhcode-top-hero.png)
 
-[npm]: https://img.shields.io/npm/v/@anthropic-ai/claude-code.svg?style=flat-square
+FH Code is Claude Code running on the FOTOhub API. You get the same terminal interface, agents, plugins, MCP and hooks, but every turn is billed to the prepaid wallet of your [fotohub.app](https://fotohub.app) account, within that account's limits.
 
-Claude Code is an agentic coding tool that lives in your terminal, understands your codebase, and helps you code faster by executing routine tasks, explaining complex code, and handling git workflows -- all through natural language commands. Use it in your terminal, IDE, or tag @claude on Github.
+On top of Claude Code, FH Code adds:
 
-**Learn more in the [official documentation](https://code.claude.com/docs/en/overview)**.
+- the FOTOhub look: the FOTOhub API hero at the top of the terminal, a violet theme, a status line with the wallet, start-up notes and tips,
+- `/login` and `/logout` for your FOTOhub account (browser sign-in), and `/budget` for the session's spend,
+- FOTOhub's other text models: Gemini, GPT-5.1 and Nova for second opinions, comparisons and copy (`/fotohub:ask`, `/fotohub:compare`, `/fotohub:second-opinion`, `fhcode ask`), and the Agent Compute models (Grok, DeepSeek, Kimi, Qwen) in `fhcode models`,
+- media spend tracking and an asset library for everything generated (`fhcode assets`),
+- design mode (`/fotohub:design`): stunning sites with original imagery from FOTOhub's 40+ image models, plus brand kits and web asset sets,
+- the built-in `fotohub` plugin: skills, `/fotohub:*` commands and agents for building on the FOTOhub API,
+- code intelligence: language servers for TS/JS, Python, Go, Rust and PHP, with `fhcode doctor` and `fhcode setup` for every dependency,
+- FOTOhub's MCP tools for image, video, audio, 3D, storage, pricing and the wallet,
+- a docs.fotohub.app search,
+- an agent hub for background agents, with follow-ups and a cost ledger (`fhcode usage`), and cloud agents on FOTOhub Agent Compute (`fhcode agents run --cloud -m <model>`),
+- updates from FOTOhub.
 
-<img src="./demo.gif" />
+```bash
+curl -fsSL https://claude.ai/install.sh | bash        # the Claude Code engine
+npm install -g https://github.com/fotohubapp/Fh-code/releases/latest/download/fh-code.tgz
+fhcode login                                           # API key from https://fotohub.app/settings/api
+cd your-project && fhcode
+```
 
-## Get started
-> [!NOTE]
-> Installation via npm is deprecated. Use one of the recommended methods below.
+| Area | In FH Code |
+|------|------------|
+| Coding | The full Claude Code terminal experience, on FOTOhub models (Sonnet 4.6, 4.5, 4, Haiku 4.5), with diagnostics from language servers after every edit |
+| Other models | Gemini 2.5 Flash/Pro, GPT-5.1, Nova and Claude chat through `fotohub_ask_model` and `fotohub_compare_models`; Agent Compute models listed by `fhcode models` |
+| Media | Every FOTOhub generation counted in the session, the ledger and the asset library (`fhcode assets`, dashboard gallery) |
+| Design | `/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, and the "FOTOhub Design" output style |
+| Agents | Claude Code subagents, plus the FH Code hub: `fhcode agents run`, `fhcode hub` dashboard, and cloud agents on FOTOhub Agent Compute (Grok, DeepSeek, Kimi, Qwen, Gemini 3.1 Pro, Opus) with `--cloud` |
+| FOTOhub | Built-in `fotohub` MCP server; `fh-code` MCP server with docs.fotohub.app, wallet, packages and hub |
+| Integrations | Any MCP server, and plugins from the `fh-code-plugins` marketplace (this repository) |
+| Account | Wallet, monthly limit and session budget (`/budget`) checked before every turn; cost in the status line |
+| Updates | `fhcode update` from FOTOhub releases |
+| IDE | `fhcode gateway` for the Claude Code IDE extensions |
+| No engine? | `fhcode lite`: FH Code's own agent |
 
-For more installation options, uninstall steps, and troubleshooting, see the [setup documentation](https://code.claude.com/docs/en/setup).
+The full guide, including how the gateway works, is in [fhcode/README.md](./fhcode/README.md).
 
-1. Install Claude Code:
+## Repository layout
 
-    **MacOS/Linux (Recommended):**
-    ```bash
-    curl -fsSL https://claude.ai/install.sh | bash
-    ```
+| Path | Contents |
+|------|----------|
+| [`fhcode/`](./fhcode) | FH Code: the FOTOhub gateway, the engine launcher, the agent hub, the lite agent, MCP, the docs index, and tests |
+| [`plugins/`](./plugins) | FH Code plugins, published as the `fh-code-plugins` marketplace ([`.claude-plugin/marketplace.json`](./.claude-plugin/marketplace.json)); `fotohub` and `fh-code-ui` ship inside FH Code |
+| [`examples/`](./examples) | Example settings, hooks, MDM profiles and gateway deployments |
+| [`mods/`](./mods) | Function-hook mods |
+| [`.devcontainer/`](./.devcontainer) | A sandboxed dev container |
+| [`.github/`](./.github) | Issue templates, FH Code CI and release workflows, and issue automation |
 
-    **Homebrew (MacOS/Linux):**
-    ```bash
-    brew install --cask claude-code
-    ```
+## Reporting bugs
 
-    **Windows (Recommended):**
-    ```powershell
-    irm https://claude.ai/install.ps1 | iex
-    ```
+File a [GitHub issue](https://github.com/fotohubapp/Fh-code/issues). For security issues, see [SECURITY.md](./SECURITY.md).
 
-    **WinGet (Windows):**
-    ```powershell
-    winget install Anthropic.ClaudeCode
-    ```
+## Data
 
-    **NPM (Deprecated):**
-    ```bash
-    npm install -g @anthropic-ai/claude-code
-    ```
+FH Code sends your prompts, the files it reads and tool output to the FOTOhub API (`apis.fotohub.app`), plus to any MCP servers you add. Usage is billed to your FOTOhub wallet. Transcripts are stored locally in `~/.fhcode/sessions/`, with API keys redacted.
 
-2. Navigate to your project directory and run `claude`.
+## License
 
-## Plugins
-
-This repository includes several Claude Code plugins that extend functionality with custom commands and agents. See the [plugins directory](./plugins/README.md) for detailed documentation on available plugins.
-
-## Reporting Bugs
-
-We welcome your feedback. Use the `/bug` command to report issues directly within Claude Code, or file a [GitHub issue](https://github.com/anthropics/claude-code/issues).
-
-## Connect on Discord
-
-Join the [Claude Developers Discord](https://anthropic.com/discord) to connect with other developers using Claude Code. Get help, share feedback, and discuss your projects with the community.
-
-## Data collection, usage, and retention
-
-When you use Claude Code, we collect feedback, which includes usage data (such as code acceptance or rejections), associated conversation data, and user feedback submitted via the `/bug` command.
-
-### How we use your data
-
-See our [data usage policies](https://code.claude.com/docs/en/data-usage).
-
-### Privacy safeguards
-
-We have implemented several safeguards to protect your data, including limited retention periods for sensitive information, restricted access to user session data, and clear policies against using feedback for model training.
-
-For full details, please review our [Commercial Terms of Service](https://www.anthropic.com/legal/commercial-terms) and [Privacy Policy](https://www.anthropic.com/legal/privacy).
+See [LICENSE.md](./LICENSE.md) and [NOTICE.md](./NOTICE.md). `fhcode/` is FOTOhub's own code under the MIT license ([fhcode/LICENSE](./fhcode/LICENSE)). Claude and Claude Code are trademarks of Anthropic PBC. FH Code is not affiliated with or endorsed by Anthropic. The Claude Code engine is installed by each user from Anthropic and used under Anthropic's terms; FH Code does not ship or modify it.

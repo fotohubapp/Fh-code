@@ -133,7 +133,7 @@ echo "✓ Frontmatter fields valid"
 **Test procedure:**
 
 ```bash
-# 1. Start Claude Code
+# 1. Start FOTOhub Code
 claude --debug
 
 # 2. Check command appears in help
@@ -267,7 +267,7 @@ Test output: !`echo "Hello from bash"`
 Analysis of output above...
 EOF
 
-# Test in Claude Code
+# Test in FOTOhub Code
 > /test-bash
 # Verify:
 # 1. Date appears correctly
@@ -529,7 +529,7 @@ echo "  - Acceptable threshold: < 3 seconds for fast commands"
 ### Resource Usage Testing
 
 ```bash
-# Monitor Claude Code during command execution
+# Monitor FOTOhub Code during command execution
 # In terminal 1:
 claude --debug
 
@@ -649,7 +649,7 @@ chmod 644 .claude/commands/my-command.md
 # Check syntax
 head -n 20 .claude/commands/my-command.md
 
-# Restart Claude Code
+# Restart FOTOhub Code
 claude --debug
 ```
 

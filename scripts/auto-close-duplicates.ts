@@ -90,7 +90,7 @@ async function closeIssueAsDuplicate(
 
 If this is incorrect, please re-open this issue or create a new one.
 
-🤖 Generated with [Claude Code](https://claude.ai/code)`
+🤖 Generated with [FOTOhub Code](https://github.com/fotohubapp/Fh-code)`
     }
   );
 
@@ -105,8 +105,8 @@ async function autoCloseDuplicates(): Promise<void> {
   }
   console.log("[DEBUG] GitHub token found");
 
-  const owner = process.env.GITHUB_REPOSITORY_OWNER || "anthropics";
-  const repo = process.env.GITHUB_REPOSITORY_NAME || "claude-code";
+  const owner = process.env.GITHUB_REPOSITORY_OWNER || "fotohubapp";
+  const repo = process.env.GITHUB_REPOSITORY_NAME || "Fh-code";
   console.log(`[DEBUG] Repository: ${owner}/${repo}`);
 
   const threeDaysAgo = new Date();

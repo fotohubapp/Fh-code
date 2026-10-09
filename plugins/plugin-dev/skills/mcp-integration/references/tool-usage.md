@@ -1,10 +1,10 @@
 # Using MCP Tools in Commands and Agents
 
-Complete guide to using MCP tools effectively in Claude Code plugin commands and agents.
+Complete guide to using MCP tools effectively in FOTOhub Code plugin commands and agents.
 
 ## Overview
 
-Once an MCP server is configured, its tools become available with the prefix `mcp__plugin_<plugin-name>_<server-name>__<tool-name>`. Use these tools in commands and agents just like built-in Claude Code tools.
+Once an MCP server is configured, its tools become available with the prefix `mcp__plugin_<plugin-name>_<server-name>__<tool-name>`. Use these tools in commands and agents just like built-in FOTOhub Code tools.
 
 ## Tool Naming Convention
 
@@ -507,7 +507,7 @@ Steps:
 - MCP server configured correctly
 - Server connected (check `/mcp`)
 - Tool names match exactly (case-sensitive)
-- Restart Claude Code after config changes
+- Restart FOTOhub Code after config changes
 
 ### Tool Calls Failing
 

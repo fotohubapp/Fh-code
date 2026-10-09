@@ -14,11 +14,11 @@ Findings cover common web-vulnerability classes — injection, XSS, SSRF, hardco
 /plugin install security-guidance@claude-plugins-official
 ```
 
-Marketplace ships enabled by default in Claude Code — no setup beyond having the CLI itself.
+Marketplace ships enabled by default in FOTOhub Code — no setup beyond having the CLI itself.
 
 ## Prerequisites
 
-- Claude Code CLI ≥ v2.1.144
+- FOTOhub Code CLI ≥ v2.1.144
 - Python 3.8+ on `PATH` (`python3`, `python`, or `py -3` — the plugin picks the first that works)
 - A working API path (subscription, API key, or 3P provider config)
 
@@ -86,7 +86,7 @@ Built-in rules cover common web-vulnerability classes without it — `claude-sec
 
 The plugin sends data to a model endpoint to perform its reviews. Specifically, each Stop-hook diff review transmits the changed file paths, the diff hunks, and the relevant file contents in the diff; each agentic commit review additionally transmits any files the reviewer pulls in via `Read`/`Grep`/`Glob` while tracing data flow. Your `claude-security-guidance.md` contents (user, project, and local) are appended to the prompt on every review, so don't put secrets in it.
 
-Where that data goes depends on your Claude Code configuration:
+Where that data goes depends on your FOTOhub Code configuration:
 - **Default (Anthropic API / subscription):** sent to `api.anthropic.com` and handled under Anthropic's [Commercial Terms](https://www.anthropic.com/legal/commercial-terms) and [Privacy Policy](https://www.anthropic.com/legal/privacy).
 - **LLM gateway** (`ANTHROPIC_BASE_URL` set): sent to your gateway URL instead. The gateway operator's terms apply.
 - **3rd-party providers** (Bedrock / Vertex / Foundry / Mantle): sent to your configured provider endpoint. The provider's data-handling terms apply (e.g., AWS / GCP / Azure).
@@ -99,7 +99,7 @@ This is a best-effort assistive tool, not a guarantee. Treat findings as suggest
 
 ## Troubleshooting
 
-**Plugin doesn't seem to fire** — check that `~/.claude/claude-security-guidance.md` (or hook activity) shows in debug logs. Run Claude Code with `--debug-file /tmp/claude/debug.txt` and grep for `security_reminder_hook`. The plugin also writes its own log to `~/.claude/security/log.txt`.
+**Plugin doesn't seem to fire** — check that `~/.claude/claude-security-guidance.md` (or hook activity) shows in debug logs. Run FOTOhub Code with `--debug-file /tmp/claude/debug.txt` and grep for `security_reminder_hook`. The plugin also writes its own log to `~/.claude/security/log.txt`.
 
 **Review never finds anything** — verify your API path works. On 3P providers, check `SECURITY_REVIEW_MODEL` is set to a provider-specific id (not a bare `claude-opus-4-7`). On LLM gateways, check the gateway's logs for `POST /v1/messages` traffic from the plugin.
 
@@ -109,8 +109,8 @@ This is a best-effort assistive tool, not a guarantee. Treat findings as suggest
 
 ## Reporting issues
 
-Open an issue on the [security-guidance plugin repo](https://github.com/anthropics/claude-code/issues) with:
-- The Claude Code CLI version (`claude --version`)
+Open an issue on the [security-guidance plugin repo](https://github.com/fotohubapp/Fh-code/issues) with:
+- The FOTOhub Code CLI version (`claude --version`)
 - Provider setup (1P / Bedrock / Vertex / LLM gateway / etc.)
 - A minimal repro diff
 - The relevant section of `~/.claude/security/log.txt`

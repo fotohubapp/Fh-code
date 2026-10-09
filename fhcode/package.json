@@ -1,0 +1,46 @@
+{
+  "name": "fh-code",
+  "version": "0.5.0",
+  "description": "FH Code (FOTOhub Code): coding agent, subagents, background agent hub, FOTOhub MCP and integrations. Runs on the FOTOhub API and bills your FOTOhub wallet.",
+  "author": "FOTOhub <dev@fotohub.app>",
+  "license": "MIT",
+  "homepage": "https://github.com/fotohubapp/Fh-code/tree/main/fhcode",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fotohubapp/Fh-code.git",
+    "directory": "fhcode"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "fhcode": "./bin/fhcode.js",
+    "fh-code": "./bin/fhcode.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "docs:index": "node scripts/build-docs-index.mjs",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "~5.9.3"
+  }
+}

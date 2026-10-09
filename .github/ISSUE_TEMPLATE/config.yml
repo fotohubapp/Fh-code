@@ -1,14 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Discord Community
-    url: https://anthropic.com/discord
-    about: Get help, ask questions, and chat with other Claude Code users
-  - name: 📖 Documentation
-    url: https://docs.claude.com/en/docs/claude-code
-    about: Read the official documentation and guides
-  - name: 🎓 Getting Started Guide
-    url: https://docs.claude.com/en/docs/claude-code/quickstart
-    about: New to Claude Code? Start here
+  - name: 📖 Engine documentation
+    url: https://code.claude.com/docs/en/overview
+    about: FOTOhub Code runs on the Claude Code engine; its documentation covers commands, settings, and plugins
   - name: 🔧 Troubleshooting Guide
-    url: https://docs.claude.com/en/docs/claude-code/troubleshooting
+    url: https://code.claude.com/docs/en/troubleshooting
     about: Common issues and how to fix them

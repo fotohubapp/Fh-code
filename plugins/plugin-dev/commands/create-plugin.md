@@ -6,7 +6,7 @@ allowed-tools: ["Read", "Write", "Grep", "Glob", "Bash", "TodoWrite", "AskUserQu
 
 # Plugin Creation Workflow
 
-Guide the user through creating a complete, high-quality Claude Code plugin from initial concept to tested implementation. Follow a systematic approach: understand requirements, design components, clarify details, implement following best practices, validate, and test.
+Guide the user through creating a complete, high-quality FOTOhub Code plugin from initial concept to tested implementation. Follow a systematic approach: understand requirements, design components, clarify details, implement following best practices, validate, and test.
 
 ## Core Principles
 
@@ -272,7 +272,7 @@ Guide the user through creating a complete, high-quality Claude Code plugin from
 
 ## Phase 7: Testing & Verification
 
-**Goal**: Test that plugin works correctly in Claude Code
+**Goal**: Test that plugin works correctly in FOTOhub Code
 
 **Actions**:
 1. **Installation instructions**:
@@ -383,7 +383,7 @@ Every component must meet these standards:
 - ✅ Includes working examples
 - ✅ Properly documented
 - ✅ Validated with utilities
-- ✅ Tested in Claude Code
+- ✅ Tested in FOTOhub Code
 
 ---
 

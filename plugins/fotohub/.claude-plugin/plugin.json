@@ -1,0 +1,18 @@
+{
+  "name": "fotohub",
+  "version": "1.2.0",
+  "description": "FOTOhub for FH Code: FOTOhub API integration, design mode for stunning websites with FOTOhub-generated imagery (40+ image models), brand kits and asset sets, media generation with FOTOhub's MCP tools and an asset library, other FOTOhub text models (Gemini, GPT-5.1, Nova) for second opinions, and commerce integrations.",
+  "author": {
+    "name": "FOTOhub",
+    "email": "dev@fotohub.app"
+  },
+  "homepage": "https://github.com/fotohubapp/Fh-code/tree/main/plugins/fotohub",
+  "keywords": [
+    "fotohub",
+    "ai",
+    "image-generation",
+    "video",
+    "ecommerce",
+    "mcp"
+  ]
+}

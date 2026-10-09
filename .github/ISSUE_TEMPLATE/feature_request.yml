@@ -1,5 +1,5 @@
 name: ✨ Feature Request
-description: Suggest a new feature or enhancement for Claude Code
+description: Suggest a new feature or enhancement for FOTOhub Code
 title: "[FEATURE] "
 labels:
   - enhancement
@@ -17,7 +17,7 @@ body:
     attributes:
       label: Preflight Checklist
       options:
-        - label: I have searched [existing requests](https://github.com/anthropics/claude-code/issues?q=is%3Aissue%20label%3Aenhancement) and this feature hasn't been requested yet
+        - label: I have searched [existing requests](https://github.com/fotohubapp/Fh-code/issues?q=is%3Aissue%20label%3Aenhancement) and this feature hasn't been requested yet
           required: true
         - label: This is a single feature request (not multiple features)
           required: true
@@ -30,7 +30,7 @@ body:
         What problem are you trying to solve? Why do you need this feature?
         Focus on the problem, not the solution. Help us understand your workflow.
       placeholder: |
-        I often need to work with multiple projects simultaneously, but Claude Code doesn't support...
+        I often need to work with multiple projects simultaneously, but FOTOhub Code doesn't support...
         
         When I'm debugging code, I find it difficult to...
         

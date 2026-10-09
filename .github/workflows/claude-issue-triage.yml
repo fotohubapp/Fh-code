@@ -27,7 +27,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Claude Code for Issue Triage
+      - name: Run FOTOhub Code for Issue Triage
         timeout-minutes: 5
         uses: anthropics/claude-code-action@v1
         env:

@@ -86,8 +86,8 @@ Environment Variables:
   }
   console.log("[DEBUG] GitHub token found");
 
-  const owner = "anthropics";
-  const repo = "claude-code";
+  const owner = "fotohubapp";
+  const repo = "Fh-code";
   const dryRun = process.env.DRY_RUN !== "false";
   const maxIssueNumber = parseInt(process.env.MAX_ISSUE_NUMBER || "4050", 10);
   const minIssueNumber = parseInt(process.env.MIN_ISSUE_NUMBER || "1", 10);

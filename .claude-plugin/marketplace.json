@@ -1,13 +1,34 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
-  "name": "claude-code-plugins",
+  "name": "fh-code-plugins",
   "version": "1.0.0",
-  "description": "Bundled plugins for Claude Code including Agent SDK development tools, PR review toolkit, and commit workflows",
+  "description": "FH Code plugins including Agent SDK development tools, PR review toolkit, and commit workflows",
   "owner": {
-    "name": "Anthropic",
-    "email": "support@anthropic.com"
+    "name": "FOTOhub"
   },
   "plugins": [
+    {
+      "name": "fotohub",
+      "description": "FOTOhub for FH Code: FOTOhub API integration skills, media generation with FOTOhub's MCP tools, commerce integrations, and FOTOhub agents",
+      "version": "1.0.0",
+      "author": {
+        "name": "FOTOhub",
+        "email": "dev@fotohub.app"
+      },
+      "source": "./plugins/fotohub",
+      "category": "development"
+    },
+    {
+      "name": "fh-code-ui",
+      "description": "FH Code's look inside the engine: the FOTOhub API hero above the prompt, with a gradient wordmark, live wallet and quick actions",
+      "version": "0.1.0",
+      "author": {
+        "name": "FOTOhub",
+        "email": "dev@fotohub.app"
+      },
+      "source": "./plugins/fh-code-ui",
+      "category": "productivity"
+    },
     {
       "name": "agent-sdk-dev",
       "description": "Development kit for working with the Claude Agent SDK",
@@ -104,7 +125,7 @@
     },
     {
       "name": "plugin-dev",
-      "description": "Comprehensive toolkit for developing Claude Code plugins. Includes 7 expert skills covering hooks, MCP integration, commands, agents, and best practices. AI-assisted plugin creation and validation.",
+      "description": "Comprehensive toolkit for developing FOTOhub Code plugins. Includes 7 expert skills covering hooks, MCP integration, commands, agents, and best practices. AI-assisted plugin creation and validation.",
       "version": "0.1.0",
       "author": {
         "name": "Daisy Hollman",

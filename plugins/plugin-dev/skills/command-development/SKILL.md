@@ -1,10 +1,10 @@
 ---
 name: Command Development
-description: This skill should be used when the user asks to "create a slash command", "add a command", "write a custom command", "define command arguments", "use command frontmatter", "organize commands", "create command with file references", "interactive command", "use AskUserQuestion in command", or needs guidance on slash command structure, YAML frontmatter fields, dynamic arguments, bash execution in commands, user interaction patterns, or command development best practices for Claude Code.
+description: This skill should be used when the user asks to "create a slash command", "add a command", "write a custom command", "define command arguments", "use command frontmatter", "organize commands", "create command with file references", "interactive command", "use AskUserQuestion in command", or needs guidance on slash command structure, YAML frontmatter fields, dynamic arguments, bash execution in commands, user interaction patterns, or command development best practices for FOTOhub Code.
 version: 0.2.0
 ---
 
-# Command Development for Claude Code
+# Command Development for FOTOhub Code
 
 ## Overview
 
@@ -505,7 +505,7 @@ PR #$1 Workflow:
 - Check file is in correct directory
 - Verify `.md` extension present
 - Ensure valid Markdown format
-- Restart Claude Code
+- Restart FOTOhub Code
 
 **Arguments not working:**
 - Verify `$1`, `$2` syntax correct

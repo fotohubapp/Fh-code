@@ -288,7 +288,7 @@ rm .claude/hookify.my-rule.local.md
 
 ## Installation
 
-This plugin is part of the Claude Code Marketplace. It should be auto-discovered when the marketplace is installed.
+This plugin is part of the FOTOhub Code Marketplace. It should be auto-discovered when the marketplace is installed.
 
 **Manual testing:**
 ```bash

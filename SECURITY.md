@@ -1,12 +1,10 @@
 # Security Policy
-Thank you for helping us keep Claude Code secure!
+Thank you for helping us keep FH Code (FOTOhub Code) secure!
 
 ## Reporting Security Issues
 
-The security of our systems and user data is Anthropic's top priority. We appreciate the work of security researchers acting in good faith in identifying and reporting potential vulnerabilities.
+Please do not report security vulnerabilities in public GitHub issues. Report them privately through [GitHub's private vulnerability reporting](https://github.com/fotohubapp/Fh-code/security/advisories/new) for this repository.
 
-Our security program is managed on HackerOne and we ask that any validated vulnerability in this functionality be reported through their [submission form](https://hackerone.com/4f1f16ba-10d3-4d09-9ecc-c721aad90f24/embedded_submissions/new).
+## FOTOhub services
 
-## Anthropic Bug Bounty
-
-Our Bug Bounty Program Guidelines are defined on our [HackerOne program page](https://hackerone.com/anthropic).
+FH Code uses Claude models served through the FOTOhub API. Vulnerabilities in FOTOhub services (apis.fotohub.app, the MCP server, fotohub.app) also go through the private report above.

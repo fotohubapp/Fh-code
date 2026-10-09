@@ -19,8 +19,16 @@ export const IMAGE_URL = "https://s1.fotohub.app/storage/v1/object/public/gen/he
  * strict: the agent endpoint answers 422 to anything beyond model, messages,
  * system and tools (max_tokens, temperature, image blocks, is_error).
  */
-export async function startMockApi({ turns = [], respond, balance = 10, monthlyLimit = null, spent = 0, mcp = true, strict = false } = {}) {
+/**
+ * compute: FOTOhub Agent Compute (comp1.fotohub.app). { approval: true } holds
+ * each task in awaiting_approval until /respond; { error: "budget_exceeded" }
+ * ends it with an error event.
+ */
+export async function startMockApi({ turns = [], respond, balance = 10, monthlyLimit = null, spent = 0, mcp = true, strict = false, compute = {} } = {}) {
   const requests = [];
+  const computeCalls = [];
+  const answers = new Map();
+  let taskCount = 0;
   const mcpCalls = [];
   const queue = [...turns];
   const server = http.createServer(async (req, res) => {
@@ -103,6 +111,39 @@ export async function startMockApi({ turns = [], respond, balance = 10, monthlyL
         max_usd: 15000,
       });
     }
+    if (req.url.startsWith("/v1/tasks/")) {
+      computeCalls.push({ method: req.method, url: req.url, body: json });
+      if (req.url === "/v1/tasks/create") return sendJson(200, { task_id: `tsk_mock${++taskCount}`, status: "created" });
+      const m = /^\/v1\/tasks\/([\w-]+)\/(stream|respond|cancel|pause)$/.exec(req.url);
+      if (!m) return sendJson(404, { detail: "no such task route" });
+      const [, id, action] = m;
+      if (action !== "stream") {
+        if (action === "respond") answers.get(id)?.(json);
+        return sendJson(200, { task_id: id, ok: true });
+      }
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      const ev = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      ev("task_status", { status: "planning" });
+      ev("commentary", { thought: "Reading the brief." });
+      if (compute.approval) {
+        ev("commentary", { thought: "Deploy to staging?" });
+        ev("task_status", { status: "awaiting_approval" });
+        const answer = await new Promise((resolve) => answers.set(id, resolve));
+        ev("task_status", { status: "executing_step" });
+        ev("commentary", { thought: `User said: ${answer.user_feedback ?? ""}` });
+      }
+      ev("tool_call", { tool: "execute_python", args: { code: "print(42)" } });
+      ev("tool_result", { tool: "execute_python", success: true, output: { stdout: "42" } });
+      if (compute.error) {
+        ev("error", { code: compute.error, message: "Max budget reached" });
+        return res.end();
+      }
+      ev("agent_delta", { content: "Report saved to " });
+      ev("agent_delta", { content: "/workspace/report.md" });
+      ev("task_status", { status: "completed" });
+      ev("done", { task_id: id, total_steps: 3, cost_usd: 0.42 });
+      return res.end();
+    }
     if (req.url === "/v1/ai/chat/completions" || req.url === "/v1/ai/chat/claude") {
       const premium = req.url.endsWith("/claude");
       const known = premium ? ["nova-micro", "nova-lite", "nova-pro", "claude-sonnet-4.6", "claude-haiku-4.5"] : ["gemini-flash", "gemini-pro", "gpt-4o", "claude-sonnet"];
@@ -155,8 +196,14 @@ export async function startMockApi({ turns = [], respond, balance = 10, monthlyL
     baseUrl: `http://127.0.0.1:${port}`,
     requests,
     mcpCalls,
+    computeCalls,
     agentRequests: () => requests.filter((r) => r.url === "/v1/ai/agent/stream"),
-    close: () => new Promise((resolve) => server.close(resolve)),
+    close: () =>
+      new Promise((resolve) => {
+        // Streams left open (a cloud task held for approval) must not keep the server up.
+        server.closeAllConnections();
+        server.close(resolve);
+      }),
   };
 }
 

@@ -126,4 +126,10 @@ test("command-line parsing", () => {
   assert.equal(parseArgs(["-r"]).resume, true);
   assert.deepEqual(parseArgs(["fix", "wallet"]).rest, ["fix", "wallet"]);
   assert.throws(() => parseArgs(["--bogus"]));
+  const cloud = parseArgs(["agents", "run", "--cloud", "-m", "grok-4.20", "--max-steps", "40", "summarize the repo"]);
+  assert.equal(cloud.cloud, true);
+  assert.equal(cloud.flags.model, "grok-4.20");
+  assert.equal(cloud.maxSteps, 40);
+  assert.deepEqual(cloud.rest, ["run", "summarize the repo"]);
+  assert.throws(() => parseArgs(["--max-steps", "0"]));
 });

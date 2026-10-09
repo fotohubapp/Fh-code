@@ -83,7 +83,7 @@ test("a background hub agent runs to completion and reports cost and output", as
     assert.ok(listHubAgents().some((a) => a.id === meta.id));
 
     // A follow-up continues the same session: the model sees the earlier turn.
-    const follow = continueHubAgent(meta.id, "and now the tests");
+    const follow = await continueHubAgent(meta.id, "and now the tests");
     let next;
     for (let i = 0; i < 100; i++) {
       next = getHubAgent(follow.id);

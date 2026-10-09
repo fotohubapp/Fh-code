@@ -13,6 +13,7 @@ import { stderr, stdout } from "node:process";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { liteMain } from "./cli.js";
+import { cloudRun, parseCloudRunArgs } from "./compute/run.js";
 import { engineInstallCommand, runStep } from "./deps.js";
 import { resolveConfig } from "./config.js";
 import { ENGINE_INSTALL_HELP, findEngine, launchEngine, statusLine } from "./engine/launch.js";
@@ -54,6 +55,7 @@ export async function main(argv: string[]): Promise<number> {
   if (first === "lite") return liteMain(rest);
   if (first === "mcp-serve") return serveMcp(process.cwd());
   if (first === "statusline") return statusLine();
+  if (first === "cloud-run") return cloudRun(parseCloudRunArgs(rest));
   if (first && OWN.has(first)) return liteMain(argv);
   if (first === "-h" || first === "--help" || first === "help") {
     stdout.write(HELP);

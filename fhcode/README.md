@@ -36,7 +36,7 @@ FH Code adds these on top:
   - Gemini 2.5 Flash and Pro, and GPT-5.1 (id `gpt-4o`), through `/v1/ai/chat/completions`;
   - Amazon Nova (Micro, Lite, 2 Lite, Pro, Premier) and Claude, through `/v1/ai/chat/claude`.
 
-  Use them for a second opinion on your changes (`/fotohub:second-opinion`), copy in another voice, translation, or cheap bulk text. Grok 4.20, Gemini 3.1 Pro, DeepSeek v3.2, Kimi K2 and Qwen3 Max run on FOTOhub Agent Compute, as cloud agents. `fhcode models` lists them, plus the ids your account's live catalog reports.
+  Use them for a second opinion on your changes (`/fotohub:second-opinion`), copy in another voice, translation, or cheap bulk text. Grok 4.20, Gemini 3.1 Pro, DeepSeek v3.2, Kimi K2, Qwen3 Max, GPT-5.1 and Claude Opus 4.6 run on FOTOhub Agent Compute, as cloud agents (below). `fhcode models` lists them, plus the ids your account's live catalog reports.
 - **Media spend and an asset library.** FOTOhub's MCP tools bill the wallet themselves, outside the agent turn. The gateway reads their results as the engine sends them back, so each generation:
   - counts toward the session's spend and budget,
   - goes in the cost ledger,
@@ -46,6 +46,10 @@ FH Code adds these on top:
 - **`/budget`.** Caps what a session may spend, generations included (`/budget 5`, `/budget off`).
 - **An agent hub.**
   - Background agents (`fhcode agents`), with follow-ups that continue an agent's session (`fhcode agents send`).
+  - **Cloud agents on FOTOhub Agent Compute** (`fhcode agents run --cloud -m <model> "task"`, the dashboard, or `hub_start_agent` with `runtime: "cloud"`). They run autonomously in FOTOhub's sandboxes, on Grok, Gemini 3.1 Pro, DeepSeek, Kimi, Qwen, GPT-5.1 or Claude Opus 4.6, with a step limit and a budget (defaults: 25 steps, $2).
+    - When one asks for approval, `fhcode agents send <id> "..."` answers it.
+    - Stopping one cancels its task.
+    - A follow-up starts a new task in the same cloud workspace.
   - A dashboard in the browser (`fhcode hub`).
 - **A cost ledger.** Every FOTOhub turn, generation and text-model question is recorded. `fhcode usage` sums it up by day, model, project and source (engine, hub, media, chat), and the dashboard charts it.
 - **Updates from FOTOhub.** `fhcode update` installs new releases, and the `fh-code-plugins` marketplace comes preconfigured.
@@ -100,8 +104,9 @@ Inside a session, everything works as in Claude Code. A few things are FOTOhub-s
 | `fhcode assets pull <id> [dir]` | Download an asset into the project (default `assets/fotohub`) |
 | `fhcode docs <query>` | Search docs.fotohub.app |
 | `fhcode agents run "prompt"` | Start a background agent (`--name`, `--mode`, `--allow-tool`) |
+| `fhcode agents run --cloud -m <model> "prompt"` | Start a cloud agent on FOTOhub Agent Compute (`--max-steps`, `--max-budget-usd`) |
 | `fhcode agents` / `agents logs <id> [-f]` / `agents stop <id>` | Watch and steer background agents |
-| `fhcode agents send <id> "message"` | Give a finished agent a follow-up; it continues in the same session |
+| `fhcode agents send <id> "message"` | Give a finished agent a follow-up; it continues in the same session. A cloud agent that is waiting gets it as its answer |
 | `fhcode hub` | The agent hub dashboard in the browser |
 | `fhcode update [--check]` | Install the latest FH Code release |
 | `fhcode gateway` | Run only the gateway, e.g. for the Claude Code IDE extensions |
@@ -188,6 +193,7 @@ To use account limits served by fotohub.app instead, set `FHCODE_ACCOUNT_LIMITS_
 | Docs source | `FHCODE_DOCS_SOURCE` | markdown source of docs.fotohub.app |
 | Update channel | `FHCODE_UPDATE_URL` | GitHub releases of fotohubapp/Fh-code |
 | Engine layout | `FHCODE_FULLSCREEN=1` (or `CLAUDE_CODE_NO_FLICKER`) | main screen, with the FOTOhub hero at the top |
+| Agent Compute base URL | `FHCODE_COMPUTE_URL` | `https://comp1.fotohub.app` |
 | Disable the daily update check | `FHCODE_NO_UPDATE_CHECK=1` | |
 
 ## Updates

@@ -20,7 +20,8 @@ plugins ship inside FH Code too (`fhcode/scripts/copy-assets.mjs`). FH Code draw
 of the terminal itself (`src/engine/hero.ts`) and runs the engine on its
 main-screen layout, since the engine's own header cannot be replaced. The
 gateway reads FOTOhub MCP results for media spend and assets (`src/media.ts`);
-FOTOhub's other text models are in `src/models.ts`. `src/deps.ts`
+FOTOhub's other text models are in `src/models.ts`, and cloud agents on FOTOhub
+Agent Compute (`fhcode cloud-run`, hub runtime "cloud") in `src/compute/`. `src/deps.ts`
 owns dependencies: `fhcode doctor`, `fhcode setup` and the generated fh-code-lsp plugin. Run `npm ci && npm test` in `fhcode/` after changing
 it; the tests run against a mock FOTOhub API and also load every plugin in
 `plugins/`, so a plugin change can break them. FOTOhub API details (endpoints,

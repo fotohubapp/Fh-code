@@ -15,7 +15,7 @@ On top of Claude Code, FH Code adds:
 - code intelligence: language servers for TS/JS, Python, Go, Rust and PHP, with `fhcode doctor` and `fhcode setup` for every dependency,
 - FOTOhub's MCP tools for image, video, audio, 3D, storage, pricing and the wallet,
 - a docs.fotohub.app search,
-- an agent hub for background agents, with follow-ups and a cost ledger (`fhcode usage`),
+- an agent hub for background agents, with follow-ups and a cost ledger (`fhcode usage`), and cloud agents on FOTOhub Agent Compute (`fhcode agents run --cloud -m <model>`),
 - updates from FOTOhub.
 
 ```bash
@@ -31,7 +31,7 @@ cd your-project && fhcode
 | Other models | Gemini 2.5 Flash/Pro, GPT-5.1, Nova and Claude chat through `fotohub_ask_model` and `fotohub_compare_models`; Agent Compute models listed by `fhcode models` |
 | Media | Every FOTOhub generation counted in the session, the ledger and the asset library (`fhcode assets`, dashboard gallery) |
 | Design | `/fotohub:design`, `/fotohub:brand`, `/fotohub:assets`, and the "FOTOhub Design" output style |
-| Agents | Claude Code subagents, plus the FH Code hub: `fhcode agents run`, `fhcode hub` dashboard |
+| Agents | Claude Code subagents, plus the FH Code hub: `fhcode agents run`, `fhcode hub` dashboard, and cloud agents on FOTOhub Agent Compute (Grok, DeepSeek, Kimi, Qwen, Gemini 3.1 Pro, Opus) with `--cloud` |
 | FOTOhub | Built-in `fotohub` MCP server; `fh-code` MCP server with docs.fotohub.app, wallet, packages and hub |
 | Integrations | Any MCP server, and plugins from the `fh-code-plugins` marketplace (this repository) |
 | Account | Wallet, monthly limit and session budget (`/budget`) checked before every turn; cost in the status line |

@@ -74,6 +74,9 @@ export interface ParsedArgs {
   help: boolean;
   version: boolean;
   check: boolean;
+  /** agents run --cloud: on FOTOhub Agent Compute. */
+  cloud: boolean;
+  maxSteps?: number;
 }
 
 const SUBCOMMANDS = new Set(["login", "logout", "wallet", "packages", "docs", "update", "help", "mcp", "plugin", "plugins", "agents", "hub", "sessions", "usage", "doctor", "setup", "assets", "models", "ask"]);
@@ -100,6 +103,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     help: false,
     version: false,
     check: false,
+    cloud: false,
   };
   const need = (i: number, name: string) => {
     const v = argv[i + 1];
@@ -113,6 +117,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case "--print":
         out.print = need(i++, a);
         break;
+      case "--cloud":
+        out.cloud = true;
+        break;
+      case "--max-steps": {
+        const n = Number(need(i++, a));
+        if (!Number.isInteger(n) || n < 1) throw new Error("--max-steps must be a positive whole number.");
+        out.maxSteps = n;
+        break;
+      }
       case "--json":
         out.outputFormat = "json";
         break;
@@ -248,6 +261,7 @@ Usage
 
 Agent hub
   fhcode agents run "prompt"      start a background agent (--name, --mode, --allow-tool)
+  fhcode agents run --cloud -m <model> "prompt"   on FOTOhub Agent Compute (Grok, DeepSeek, Kimi, Qwen, Opus...)
   fhcode agents                   list background agents
   fhcode agents logs <id> [-f]    show an agent's output (follow with -f)
   fhcode agents send <id> "msg"   continue a finished agent in its session
@@ -690,8 +704,11 @@ function printAgents(): void {
     return;
   }
   for (const a of agents.slice(0, 30)) {
-    const status = a.status === "running" ? blue(a.status) : a.status === "done" ? green(a.status) : a.status === "stopped" ? dim(a.status) : red(a.status);
-    stdout.write(`${a.id}  ${status.padEnd(useColor ? 16 : 7)}  $${fmt(a.costUsd).padEnd(7)} ${String(a.turns).padStart(3)} turns  ${a.name}${a.lastActivity ? dim(`  · ${a.lastActivity}`) : ""}\n`);
+    const status =
+      a.status === "running" ? blue(a.status) : a.status === "waiting" ? yellow(a.status) : a.status === "done" ? green(a.status) : a.status === "stopped" ? dim(a.status) : red(a.status);
+    const cloud = a.engine === "cloud" ? purple(`☁ ${a.model ?? "claude-opus-4.6"} `) : "";
+    stdout.write(`${a.id}  ${status.padEnd(useColor ? 16 : 7)}  $${fmt(a.costUsd).padEnd(7)} ${String(a.turns).padStart(3)} turns  ${cloud}${a.name}${a.lastActivity ? dim(`  · ${a.lastActivity}`) : ""}\n`);
+    if (a.status === "waiting") stdout.write(yellow(`    waiting for you: fhcode agents send ${a.id} "answer"  (start with "no" to refuse)\n`));
   }
 }
 
@@ -951,7 +968,7 @@ async function agentsCommand(args: ParsedArgs, config: FhcodeConfig): Promise<nu
     case "run":
     case "start": {
       const prompt = rest.join(" ").trim();
-      if (!prompt) throw new Error('Usage: fhcode agents run "prompt" [--name n] [--mode accept-edits] [--allow-tool rule]');
+      if (!prompt) throw new Error('Usage: fhcode agents run "prompt" [--name n] [--mode accept-edits] [--allow-tool rule] [--cloud --model <id> --max-steps n]');
       if (!config.apiKey) throw new Error("No FOTOhub API key. Run fhcode login.");
       const meta = startHubAgent({
         prompt,
@@ -961,8 +978,11 @@ async function agentsCommand(args: ParsedArgs, config: FhcodeConfig): Promise<nu
         model: args.flags.model,
         allowTools: args.allowTools,
         maxBudgetUsd: args.flags.maxBudgetUsd,
+        maxSteps: args.maxSteps,
+        ...(args.cloud ? { engine: "cloud" as const } : {}),
       });
-      stdout.write(`Started ${bold(meta.id)} "${meta.name}" (mode ${meta.mode}). Follow it: fhcode agents logs ${meta.id} -f\n`);
+      const where = meta.engine === "cloud" ? `in the cloud on FOTOhub Agent Compute, ${meta.model ?? "claude-opus-4.6"}` : `mode ${meta.mode}`;
+      stdout.write(`Started ${bold(meta.id)} "${meta.name}" (${where}). Follow it: fhcode agents logs ${meta.id} -f\n`);
       return 0;
     }
     case "logs": {
@@ -974,7 +994,7 @@ async function agentsCommand(args: ParsedArgs, config: FhcodeConfig): Promise<nu
         for (const e of events.slice(shown)) printHubEvent(e);
         shown = events.length;
         const state = getHubAgent(id);
-        if (!args.follow || state.status !== "running") {
+        if (!args.follow || (state.status !== "running" && state.status !== "waiting")) {
           stdout.write(dim(`\n[${state.status} · $${fmt(state.costUsd)} · ${state.turns} turns]\n`));
           if (state.error) stdout.write(red(`${state.error}\n`));
           return 0;
@@ -986,8 +1006,12 @@ async function agentsCommand(args: ParsedArgs, config: FhcodeConfig): Promise<nu
       const [id, ...words] = rest;
       const prompt = words.join(" ").trim();
       if (!id || !prompt) throw new Error('Usage: fhcode agents send <id> "message"');
-      const meta = continueHubAgent(id, prompt);
-      stdout.write(`Started ${bold(meta.id)}, continuing ${id}. Follow it: fhcode agents logs ${meta.id} -f\n`);
+      const meta = await continueHubAgent(id, prompt);
+      stdout.write(
+        meta.id === id
+          ? `Answered ${bold(id)}; it continues in the cloud. Follow it: fhcode agents logs ${id} -f\n`
+          : `Started ${bold(meta.id)}, continuing ${id}. Follow it: fhcode agents logs ${meta.id} -f\n`,
+      );
       return 0;
     }
     case "stop":
@@ -1009,6 +1033,12 @@ function printHubEvent(e: Record<string, unknown>): void {
   else if (e.type === "subagent_start") stdout.write(`\n${blue("◆")} ${String(e.agentType)} ${dim(String(e.description ?? ""))}\n`);
   else if (e.type === "notice") stdout.write(yellow(`\n! ${String(e.text)}\n`));
   else if (e.type === "error") stdout.write(red(`\n${String(e.message)}\n`));
+  // Cloud agents (FOTOhub Agent Compute)
+  else if (e.type === "session_start" && e.runtime === "cloud") stdout.write(purple(`☁ FOTOhub Agent Compute task ${String(e.sessionId)} · ${String(e.model)}\n`));
+  else if (e.type === "thought") stdout.write(dim(`  ${String(e.text)}\n`));
+  else if (e.type === "cloud_status") stdout.write(e.status === "awaiting_approval" ? yellow(`\n? The agent is waiting for your answer: fhcode agents send <id> "..."\n`) : dim(`[${String(e.status)}]\n`));
+  else if (e.type === "approval_sent") stdout.write(yellow(`\n> ${e.approved ? "approved" : "refused"}: ${String(e.text)}\n`));
+  else if (e.type === "result" && typeof e.steps === "number") stdout.write(dim(`\n[cloud task done · ${String(e.steps)} steps · $${fmt(Number(e.sessionUsd ?? 0))}]\n`));
   // Claude Code engine events
   else if (e.type === "assistant" && !e.parent_tool_use_id) {
     for (const block of ((e.message as { content?: Array<Record<string, unknown>> } | undefined)?.content ?? [])) {

@@ -7,17 +7,24 @@
  *                                            text_delta, tool_call, usage, result, error)
  *   ~/.fhcode/hub/agents/<id>/stderr.log
  *
+ * An agent runs on the engine (Claude Code on the FOTOhub API), on the lite
+ * agent, or in the cloud on FOTOhub Agent Compute (`fhcode cloud-run`): Grok,
+ * DeepSeek, Kimi, Qwen, Gemini 3.1 Pro, GPT-5.1 or Claude Opus 4.6 with their
+ * own sandbox and workspace.
+ *
  * The CLI (fhcode agents ...), the dashboard (fhcode hub) and the hub tools of
  * an interactive session all work on this directory.
  */
 
 import { spawn } from "node:child_process";
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { CONFIG_DIR } from "../config.js";
 import type { PermissionMode } from "../agent/permissions.js";
+import { ComputeClient } from "../compute/client.js";
+import { resolveConfig } from "../config.js";
 import { findEngine } from "../engine/launch.js";
 
 export const HUB_DIR = path.join(CONFIG_DIR, "hub", "agents");
@@ -36,13 +43,16 @@ export interface HubAgentMeta {
   stoppedAt?: string;
   /** The hub agent that started this one, if any. */
   parent?: string;
-  /** "engine" (Claude Code on the FOTOhub API) or "lite" (the built-in agent). */
-  engine?: "engine" | "lite";
+  /** "engine" (Claude Code on the FOTOhub API), "lite" (the built-in agent) or "cloud" (FOTOhub Agent Compute). */
+  engine?: HubRuntime;
   /** Set on a follow-up: the session it continues. */
   resumeSession?: string;
 }
 
-export type HubAgentStatus = "running" | "done" | "failed" | "stopped" | "exited";
+export type HubRuntime = "engine" | "lite" | "cloud";
+
+/** "waiting": a cloud agent asks for approval or clarification (fhcode agents send). */
+export type HubAgentStatus = "running" | "waiting" | "done" | "failed" | "stopped" | "exited";
 
 export interface HubAgentState extends HubAgentMeta {
   status: HubAgentStatus;
@@ -66,7 +76,9 @@ export interface StartOptions {
   maxBudgetUsd?: number;
   parent?: string;
   /** Which agent runs it; defaults to the engine when it is installed. */
-  engine?: "engine" | "lite";
+  engine?: HubRuntime;
+  /** Cloud agents: tool steps allowed (default 25). */
+  maxSteps?: number;
   /** Continue this engine or lite session instead of starting a new one. */
   resumeSession?: string;
 }
@@ -91,7 +103,11 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
     resumeSession: options.resumeSession,
   };
   let args: string[];
-  if (meta.engine === "engine") {
+  if (meta.engine === "cloud") {
+    args = [BIN, "cloud-run", "--max-steps", String(options.maxSteps ?? 25), "--budget", String(options.maxBudgetUsd ?? 2)];
+    if (options.model) args.push("--model", options.model);
+    args.push("--", options.prompt);
+  } else if (meta.engine === "engine") {
     // Claude Code's -p takes the prompt as its positional argument; the
     // variadic --allowedTools goes last so it cannot swallow it.
     args = [BIN, "-p", options.prompt, "--output-format", "stream-json", "--verbose", "--permission-mode", ENGINE_MODES[meta.mode]];
@@ -128,11 +144,36 @@ export function startHubAgent(options: StartOptions): HubAgentMeta {
   return meta;
 }
 
-/** Sends a finished agent a follow-up: a new hub run that continues its session. */
-export function continueHubAgent(id: string, prompt: string): HubAgentMeta {
+/**
+ * Sends an agent a follow-up. A cloud agent that is waiting gets it as its
+ * answer (approved); any finished agent gets a new hub run that continues
+ * its session (a cloud agent: a new task in the same persistent workspace).
+ */
+export async function continueHubAgent(id: string, prompt: string): Promise<HubAgentMeta> {
   const prev = getHubAgent(id);
-  if (prev.status === "running") throw new Error(`Agent ${id} is still running; wait for it or stop it first.`);
+  if (prev.engine === "cloud" && prev.status === "waiting") {
+    const { apiKey } = resolveConfig();
+    if (!apiKey || !prev.sessionId) throw new Error("Not signed in to FOTOhub, or the task has no id yet.");
+    const deny = /^\s*(no|deny|reject|nie|stop)\b/i.test(prompt);
+    await new ComputeClient(apiKey).respond(prev.sessionId, !deny, prompt);
+    appendFileSync(path.join(HUB_DIR, safeId(id), "events.jsonl"), JSON.stringify({ type: "approval_sent", approved: !deny, text: prompt }) + "\n");
+    return prev;
+  }
+  if (prev.status === "running" || prev.status === "waiting") throw new Error(`Agent ${id} is still running; wait for it or stop it first.`);
   if (!prev.sessionId) throw new Error(`Agent ${id} has no session to continue.`);
+  if (prev.engine === "cloud") {
+    return startHubAgent({
+      prompt:
+        `Follow-up to FOTOhub Agent Compute task ${prev.sessionId}; its files are still in /workspace.\n` +
+        `What that task reported:\n${prev.output.slice(-3000) || "(no output)"}\n\nNow: ${prompt}`,
+      cwd: prev.cwd,
+      name: `${prev.name.replace(/ ↳.*$/, "")} ↳ ${prompt.split("\n")[0].slice(0, 32)}`,
+      mode: prev.mode,
+      model: prev.model,
+      engine: "cloud",
+      parent: id,
+    });
+  }
   return startHubAgent({
     prompt,
     cwd: prev.cwd,
@@ -170,6 +211,7 @@ export function getHubAgent(id: string): HubAgentState {
   const meta = JSON.parse(readFileSync(path.join(dir, "meta.json"), "utf8")) as HubAgentMeta;
   const state: HubAgentState = { ...meta, status: "running", costUsd: 0, turns: 0, toolCalls: 0, output: "" };
   let text = "";
+  let waiting = false;
   let finished: "done" | "failed" | undefined;
   let engineResult: string | undefined;
   for (const e of readEvents(id)) {
@@ -189,6 +231,18 @@ export function getHubAgent(id: string): HubAgentState {
         break;
       case "session_start":
         if (typeof e.sessionId === "string") state.sessionId = e.sessionId;
+        break;
+      // Cloud agents (fhcode cloud-run)
+      case "cloud_status":
+        waiting = e.status === "awaiting_approval";
+        state.lastActivity = String(e.status);
+        break;
+      case "thought":
+        if (waiting || typeof e.text !== "string") break;
+        state.lastActivity = e.text.slice(0, 60);
+        break;
+      case "approval_sent":
+        waiting = false;
         break;
       case "system":
         if (e.subtype === "init" && typeof e.session_id === "string") state.sessionId = e.session_id;
@@ -212,8 +266,9 @@ export function getHubAgent(id: string): HubAgentState {
       }
       case "result":
         if (typeof e.sessionUsd === "number") {
-          // lite
+          // lite and cloud
           state.costUsd = e.sessionUsd;
+          if (typeof e.steps === "number") state.turns = e.steps;
           finished = "done";
         } else {
           finished = e.is_error === true || (typeof e.subtype === "string" && e.subtype !== "success") ? "failed" : "done";
@@ -233,6 +288,7 @@ export function getHubAgent(id: string): HubAgentState {
   state.output = text.trim();
   if (meta.stoppedAt) state.status = "stopped";
   else if (finished) state.status = finished;
+  else if (waiting && isAlive(meta.pid)) state.status = "waiting";
   else if (!isAlive(meta.pid)) {
     state.status = "exited";
     const stderr = safeRead(path.join(dir, "stderr.log")).trim();
@@ -274,7 +330,7 @@ export function stopHubAgent(id: string): boolean {
 
 export function removeHubAgent(id: string): void {
   const state = getHubAgent(id);
-  if (state.status === "running") throw new Error(`Agent ${id} is still running; stop it first.`);
+  if (state.status === "running" || state.status === "waiting") throw new Error(`Agent ${id} is still running; stop it first.`);
   rmSync(path.join(HUB_DIR, safeId(id)), { recursive: true, force: true });
 }
 

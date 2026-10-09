@@ -167,7 +167,7 @@ export function describeModels(): string {
   };
   const lines = ["FOTOhub text models (docs.fotohub.app/api/models#chat-and-llm-models):"];
   for (const m of TEXT_MODELS) lines.push(`- ${m.id} — ${m.name} (${m.provider}); ${where[m.endpoint]}; ${price(m)}; ${m.note}`);
-  lines.push("", "On Agent Compute (cloud agents, comp1.fotohub.app; docs.fotohub.app/compute/autonomous-agents):");
+  lines.push("", "On Agent Compute (cloud agents, comp1.fotohub.app; docs.fotohub.app/compute/autonomous-agents). Run one with `fhcode agents run --cloud -m <id> \"task\"` or hub_start_agent runtime \"cloud\":");
   for (const m of COMPUTE_MODELS) lines.push(`- ${m.name} (${m.provider})${m.id ? `, id ${m.id}` : ""}; ${price(m)}; ${m.note}`);
   return lines.join("\n");
 }

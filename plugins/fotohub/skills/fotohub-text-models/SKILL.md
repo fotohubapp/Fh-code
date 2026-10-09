@@ -30,7 +30,17 @@ Aliases: `gemini` → gemini-flash, `gpt` → gpt-4o, `nova` → nova-lite, `son
 
 ## Grok, Gemini 3.1 Pro, DeepSeek, Kimi, Qwen, Opus
 
-These run on FOTOhub **Agent Compute** (`comp1.fotohub.app/v1/tasks`, docs.fotohub.app/compute/autonomous-agents): autonomous cloud agents with their own sandbox and workspace, not chat endpoints. They cannot answer through `fotohub_ask_model`. The docs publish their prices but, apart from `claude-opus-4.6` and `gpt-4o`, not their request ids: `fhcode models` shows the ids the account's live catalog reports. To build an app on Agent Compute, follow the docs with `fotohub_docs_read` path `compute/autonomous-agents`.
+These run on FOTOhub **Agent Compute** (`comp1.fotohub.app/v1/tasks`, docs.fotohub.app/compute/autonomous-agents): autonomous cloud agents with their own sandbox and workspace, not chat endpoints. They cannot answer through `fotohub_ask_model`.
+
+FH Code runs them as **cloud agents in the hub**:
+
+- `hub_start_agent` with `runtime: "cloud"` and `model` (fh-code MCP), or `fhcode agents run --cloud -m <model> "task"` in a terminal.
+- A cloud agent works in its own cloud workspace and cannot see local files. Put everything it needs in the prompt, or a URL it can fetch.
+- It may stop and wait for approval (status `waiting`). Answer it with `hub_send_agent`: start the message with "no" to refuse.
+- `hub_agent_output` shows its report and cost. Stopping it cancels the task.
+- Defaults: `claude-opus-4.6`, 25 steps, a $2 budget (`max_budget_usd`, `max_steps`).
+
+The docs publish the prices of these models but, apart from `claude-opus-4.6` and `gpt-4o`, not their request ids. `fhcode models` shows the ids the account's live catalog reports; use those. To build an app on Agent Compute, follow the docs with `fotohub_docs_read` path `compute/autonomous-agents`.
 
 ## Good practice
 

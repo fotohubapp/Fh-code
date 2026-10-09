@@ -34,12 +34,13 @@ export async function cloudRun(options: CloudRunOptions): Promise<number> {
   const controller = new AbortController();
   let taskId: string | undefined;
   let finished = false;
+  // Set when stopped: the cancel request, which must reach Agent Compute
+  // before this process exits, or the task keeps running (and billing).
+  let cancelled: Promise<void> | undefined;
 
   const onTerm = () => {
+    cancelled = taskId && !finished ? client.cancel(taskId).catch(() => undefined) : Promise.resolve();
     controller.abort();
-    const done = () => process.exit(143);
-    if (taskId && !finished) client.cancel(taskId).then(done, done);
-    else done();
   };
   process.once("SIGTERM", onTerm);
   process.once("SIGINT", onTerm);
@@ -94,11 +95,18 @@ export async function cloudRun(options: CloudRunOptions): Promise<number> {
       }
     }
     finished = true;
+    if (cancelled) {
+      await cancelled;
+      return 143;
+    }
     emit({ type: "error", message: "The Agent Compute stream ended before the task finished." });
     return 1;
   } catch (err) {
     finished = true;
-    if (controller.signal.aborted) return 143;
+    if (cancelled) {
+      await cancelled;
+      return 143;
+    }
     emit({ type: "error", message: `Agent Compute: ${(err as Error).message}` });
     return 1;
   } finally {
